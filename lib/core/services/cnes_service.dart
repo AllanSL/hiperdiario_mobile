@@ -84,11 +84,22 @@ class CnesService {
       final id = '$ibgeStr$cnesStr';
       debugPrint('[CnesService] Buscando profissionais do ID completo: $id');
 
+      // Obtém um cookie de sessão válido simulando o acesso à página principal
+      final mainPageResponse = await http.get(
+        Uri.parse('https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp'),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+        },
+      ).timeout(const Duration(seconds: 10));
+      
+      final cookies = mainPageResponse.headers['set-cookie'] ?? '';
+
       final uri = Uri.parse('https://cnes.datasus.gov.br/services/estabelecimentos-profissionais/$id');
       final response = await http.get(uri, headers: {
         'Referer': 'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
         'Accept': 'application/json',
+        if (cookies.isNotEmpty) 'Cookie': cookies,
       }).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
@@ -153,11 +164,22 @@ class CnesService {
       final id = '$ibgeStr$cnesStr';
       debugPrint('[CnesService] Buscando horários do ID completo: $id');
 
+      // Obtém um cookie de sessão válido simulando o acesso à página principal
+      final mainPageResponse = await http.get(
+        Uri.parse('https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp'),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+        },
+      ).timeout(const Duration(seconds: 10));
+      
+      final cookies = mainPageResponse.headers['set-cookie'] ?? '';
+
       final uri = Uri.parse('https://cnes.datasus.gov.br/services/estabelecimentos/atendimento/$id');
       final response = await http.get(uri, headers: {
         'Referer': 'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
         'Accept': 'application/json',
+        if (cookies.isNotEmpty) 'Cookie': cookies,
       }).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {

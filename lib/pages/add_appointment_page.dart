@@ -497,7 +497,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
 
           while (current.hour < endTime.hour ||
               (current.hour == endTime.hour &&
-                  current.minute <= endTime.minute)) {
+                  current.minute < endTime.minute)) {
             slots.add(current);
             int nextMin = current.minute + 30;
             int nextHour = current.hour;
@@ -975,7 +975,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                           context,
                           labelText: 'Especialidade',
                           hintText: hasLocation
-                              ? 'Ex: Cardiologia, Clínico Geral'
+                              ? 'Selecione uma especialidade'
                               : 'Escolha um local primeiro',
                           prefixIcon: Icon(
                             Icons.medical_services,
