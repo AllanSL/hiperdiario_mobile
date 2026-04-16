@@ -15,6 +15,7 @@ class AppState extends ChangeNotifier {
   Patient? _patient;
   List<Appointment> _appointments = [];
   List<Medication> _medications = [];
+  List<PendingDispensation> _pendingDispensations = [];
   int _lowStockDaysThreshold =
       2; // dias de doses restantes para considerar estoque baixo
 
@@ -22,6 +23,7 @@ class AppState extends ChangeNotifier {
   Patient? get patient => _patient;
   List<Appointment> get appointments => List.unmodifiable(_appointments);
   List<Medication> get medications => List.unmodifiable(_medications);
+  List<PendingDispensation> get pendingDispensations => List.unmodifiable(_pendingDispensations);
   int get lowStockDaysThreshold => _lowStockDaysThreshold;
 
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -45,6 +47,7 @@ class AppState extends ChangeNotifier {
           _patient = null;
           _appointments = [];
           _medications = [];
+          _pendingDispensations = [];
         } else {
           _loadDataAndSchedule();
         }
@@ -406,6 +409,7 @@ class AppState extends ChangeNotifier {
       _patient = null;
       _appointments = [];
       _medications = [];
+      _pendingDispensations = [];
       notifyListeners();
       return;
     }
@@ -497,6 +501,35 @@ class AppState extends ChangeNotifier {
     _medications = (medicationRows as List)
         .map((row) => _mapMedicationFromDb(row as Map<String, dynamic>))
         .toList();
+
+    if (profileId != null) {
+      try {
+        final pendingRows = await _supabase
+            .from('medicine_dispensations')
+            .select('id, dispensed_quantity, dispensed_at, prescribing_doctor, medicine_catalog ( active_principle, strength, form )')
+            .eq('patient_id', profileId)
+            .eq('acknowledged_in_app', false);
+            
+        _pendingDispensations = (pendingRows as List).map((row) {
+          final map = row as Map<String, dynamic>;
+          final catalog = map['medicine_catalog'] as Map<String, dynamic>? ?? {};
+          return PendingDispensation(
+            id: map['id'].toString(),
+            activePrinciple: catalog['active_principle']?.toString() ?? 'Medicamento Local',
+            strength: catalog['strength']?.toString() ?? '',
+            form: catalog['form']?.toString() ?? '',
+            dispensedQuantity: int.tryParse(map['dispensed_quantity']?.toString() ?? '0') ?? 0,
+            dispensedAt: DateTime.tryParse(map['dispensed_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
+            prescribingDoctor: map['prescribing_doctor']?.toString() ?? 'Não informado',
+          );
+        }).toList();
+      } catch (e) {
+        debugPrint('Erro ao buscar retiradas pendentes de medicamento: $e');
+        _pendingDispensations = [];
+      }
+    } else {
+      _pendingDispensations = [];
+    }
 
     notifyListeners();
 
@@ -680,6 +713,7 @@ class AppState extends ChangeNotifier {
       dosage: dosage.isEmpty ? 'Sem posologia informada' : dosage,
       times: _parseMedicationTimes(row['frequency']),
       stockUnits: stock,
+      dispensationId: row['dispensation_id']?.toString(),
     );
   }
 
@@ -947,6 +981,45 @@ class AppState extends ChangeNotifier {
       await NotificationService.instance.scheduleMedicationReminders(m);
     } catch (e) {
       // Ignora erro de notificações - não deve impedir salvamento
+    }
+  }
+
+  Future<void> acknowledgeDispensation(
+    PendingDispensation disp,
+    List<TimeOfDayLite> times,
+    String finalDosage,
+  ) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final name = '${disp.activePrinciple} ${disp.strength}';
+
+      final doc = {
+        'owner_id': user.id,
+        'name': name,
+        'dispensation_id': disp.id,
+        'dosage_instructions': finalDosage,
+        'frequency': times.map((t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}').toList(),
+        'stock': disp.dispensedQuantity,
+        'active': true,
+      };
+      
+      final response = await _supabase.from('medications').insert(doc).select('*').single();
+      final newMed = _mapMedicationFromDb(response);
+      
+      // Update dispensation status
+      await _supabase.from('medicine_dispensations').update({
+        'acknowledged_in_app': true
+      }).eq('id', disp.id);
+      
+      _medications = [..._medications, newMed];
+      _pendingDispensations = _pendingDispensations.where((d) => d.id != disp.id).toList();
+      notifyListeners();
+      
+      await NotificationService.instance.scheduleMedicationReminders(newMed);
+    } catch (e) {
+      debugPrint('Erro ao reconhecer retirada de medicamento: $e');
     }
   }
 

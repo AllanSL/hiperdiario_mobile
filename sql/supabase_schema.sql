@@ -178,3 +178,87 @@ BEGIN
   RETURN v_nome;
 END;
 $$;
+
+-- ==========================================
+-- CATÁLOGO DE MEDICAMENTOS (FARMÁCIA SUS)
+-- ==========================================
+
+-- 1. Criação do Catálogo Padrão SUS
+CREATE TABLE IF NOT EXISTS medicine_catalog (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  active_principle text NOT NULL,    
+  strength text NOT NULL,            
+  form text NOT NULL,                
+  category text NOT NULL,            
+  dispensing_unit text NOT NULL,     
+  reference_box_qty integer,         
+  created_at timestamptz DEFAULT now()
+);
+
+-- 2. Inserção dos dados que mapeamos
+INSERT INTO medicine_catalog (active_principle, strength, form, category, dispensing_unit, reference_box_qty) VALUES
+-- HIPERTENSÃO
+('Atenolol', '25 mg', 'comprimido', 'Hipertensão', 'comprimido', 30), 
+('Atenolol', '50 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Atenolol', '100 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Besilato de anlodipino', '5 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Besilato de anlodipino', '10 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Captopril', '25 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Carvedilol', '3,125 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Carvedilol', '6,25 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Carvedilol', '12,5 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Carvedilol', '25 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Cloridrato de hidralazina', '25 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Cloridrato de hidralazina', '50 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Cloridrato de propranolol', '10 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Cloridrato de propranolol', '40 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Cloridrato de verapamil', '80 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Cloridrato de verapamil', '120 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Cloridrato de verapamil', '2,5 mg/mL', 'solução injetável', 'Hipertensão', 'ampola', 1),
+('Espironolactona', '25 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Espironolactona', '100 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Furosemida', '40 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Furosemida', '10 mg/mL', 'solução injetável', 'Hipertensão', 'ampola', 1),
+('Hidroclorotiazida', '12,5 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Hidroclorotiazida', '25 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Losartana Potássica', '50 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Maleato de enalapril', '5 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Maleato de enalapril', '10 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Maleato de enalapril', '20 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Mesilato de doxazosina', '2 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Mesilato de doxazosina', '4 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Metildopa', '250 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+('Nifedipino', '10 mg', 'cápsula ou comprimido', 'Hipertensão', 'unidade', 30),
+('Succinato de metoprolol', '25 mg', 'comprimido de liberação prolongada', 'Hipertensão', 'comprimido', 30),
+('Succinato de metoprolol', '50 mg', 'comprimido de liberação prolongada', 'Hipertensão', 'comprimido', 30),
+('Succinato de metoprolol', '100 mg', 'comprimido de liberação prolongada', 'Hipertensão', 'comprimido', 30),
+('Tartarato de metoprolol', '100 mg', 'comprimido', 'Hipertensão', 'comprimido', 30),
+
+-- DIABETES (Comprimidos)
+('Glibenclamida', '5 mg', 'comprimido', 'Diabetes', 'comprimido', 30),
+('Cloridrato de metformina', '500 mg', 'comprimido', 'Diabetes', 'comprimido', 30),
+('Cloridrato de metformina', '850 mg', 'comprimido', 'Diabetes', 'comprimido', 30),
+('Cloridrato de metformina', '500 mg', 'comprimido de ação prolongada', 'Diabetes', 'comprimido', 30),
+
+-- DIABETES (Insulinas)
+('Insulina Humana NPH', '100 UI/ml', 'suspensão injetável', 'Diabetes', 'frasco-ampola 10 ml', 1),
+('Insulina Humana NPH', '100 UI/ml', 'suspensão injetável', 'Diabetes', 'frasco-ampola 5 ml', 1),
+('Insulina Humana NPH', '100 UI/ml', 'suspensão injetável', 'Diabetes', 'refil 3ml (carpule)', 1),
+('Insulina Humana NPH', '100 UI/ml', 'suspensão injetável', 'Diabetes', 'refil 1,5ml (carpule)', 1),
+('Insulina Humana Regular', '100 UI/ml', 'solução injetável', 'Diabetes', 'frasco-ampola 10 ml', 1),
+('Insulina Humana Regular', '100 UI/ml', 'solução injetável', 'Diabetes', 'frasco-ampola 5 ml', 1),
+('Insulina Humana Regular', '100 UI/ml', 'solução injetável', 'Diabetes', 'refil 3ml (carpules)', 1),
+('Insulina Humana Regular', '100 UI/ml', 'solução injetável', 'Diabetes', 'refil 1,5ml (carpules)', 1);
+
+-- 3. Tabela de Controle da Dispensação mensal
+CREATE TABLE IF NOT EXISTS medicine_dispensations (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  patient_id bigint REFERENCES users(id),
+  catalog_id uuid REFERENCES medicine_catalog(id),
+  ubs_cnes text NOT NULL,                    
+  dispensed_quantity integer NOT NULL,       
+  prescribing_doctor text NOT NULL,          
+  prescription_date date NOT NULL,           
+  dispensed_at timestamptz DEFAULT now(),
+  acknowledged_in_app boolean DEFAULT false
+);

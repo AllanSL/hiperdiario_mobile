@@ -4,6 +4,7 @@ class Medication {
   final String dosage; // ex: 500mg 1x ao dia
   final List<TimeOfDayLite> times; // horários do dia
   int stockUnits; // unidades em casa
+  final String? dispensationId; // Identificador da UBS, se nulo = criado pelo paciente.
 
   Medication({
     required this.id,
@@ -11,6 +12,7 @@ class Medication {
     required this.dosage,
     required this.times,
     required this.stockUnits,
+    this.dispensationId,
   });
 }
 
@@ -18,4 +20,24 @@ class TimeOfDayLite {
   final int hour;
   final int minute;
   const TimeOfDayLite(this.hour, this.minute);
+}
+
+class PendingDispensation {
+  final String id;
+  final String activePrinciple;
+  final String strength;
+  final String form;
+  final int dispensedQuantity;
+  final DateTime dispensedAt;
+  final String prescribingDoctor;
+
+  PendingDispensation({
+    required this.id,
+    required this.activePrinciple,
+    required this.strength,
+    required this.form,
+    required this.dispensedQuantity,
+    required this.dispensedAt,
+    required this.prescribingDoctor,
+  });
 }

@@ -456,14 +456,31 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           Set<TimeOfDay> horariosOcupados = {};
 
           try {
+            final specialtyText = _specialtyController.text;
+            final parts = specialtyText.split(' - ');
+            final profName = parts.length > 1 ? parts.last.trim() : specialtyText.trim();
+
+            // 1. Busco Agendamentos Normais (Pacientes)
             final agendamentosDb = await Supabase.instance.client
                 .from('appointments')
                 .select('date_time')
-                .filter('location', 'eq', _locationController.text)
+                .eq('location', _locationController.text)
+                .eq('specialty', specialtyText)
                 .gte('date_time', dataInicio)
                 .lte('date_time', dataFim);
 
-            horariosOcupados = agendamentosDb.map((e) {
+            // 2. Busco Bloqueios Manuais (Painel Web do Médico)
+            final bloqueiosDb = await Supabase.instance.client
+                .from('blocked_times')
+                .select('date_time')
+                .eq('location', _locationController.text)
+                .ilike('professional_name', '%$profName%')
+                .gte('date_time', dataInicio)
+                .lte('date_time', dataFim);
+
+            final allOcupados = [...agendamentosDb, ...bloqueiosDb];
+
+            horariosOcupados = allOcupados.map((e) {
               final dt = DateTime.parse(e['date_time']).toLocal();
               return TimeOfDay(hour: dt.hour, minute: dt.minute);
             }).toSet();
@@ -480,6 +497,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                 .where(
                   (a) =>
                       a.location == _locationController.text &&
+                      a.specialty == _specialtyController.text &&
                       DateFormat('yyyy-MM-dd').format(a.dateTime) == dataBusca,
                 )
                 .map(

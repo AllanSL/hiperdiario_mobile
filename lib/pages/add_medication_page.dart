@@ -146,6 +146,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isSusMed = widget.initial?.dispensationId != null;
+
     return GestureDetector(
       onTap: () {
         // Fecha o teclado e remove o foco ao clicar fora dos campos
@@ -165,11 +167,35 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (isSusMed)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Medicamento do SUS. O nome e a posologia não podem ser alterados.',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
             _SelectorField(
                   label: 'Nome do medicamento',
                   icon: Icons.medical_services_rounded,
-                  valueText: _isOtherMed ? 'Outro' : (_selectedMedName ?? ''),
-                  onTap: () async {
+                  valueText: isSusMed ? widget.initial!.name : (_isOtherMed ? 'Outro' : (_selectedMedName ?? '')),
+                  onTap: isSusMed ? null : () async {
                     FocusScope.of(context).unfocus(); // Fecha o teclado
                     final choice = await _openBottomSheet(context, 'Selecione o medicamento', _medNames);
                     // Garante que o foco não retorne após fechar o bottom sheet
@@ -182,9 +208,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                       if (!_isOtherMed) _nameCtrl.clear();
                     });
                   },
-                  validator: () => _selectedMedName == null ? 'Selecione um medicamento' : null,
+                  validator: () => _selectedMedName == null && !isSusMed ? 'Selecione um medicamento' : null,
               ),
-            if (_isOtherMed) ...[
+            if (_isOtherMed && !isSusMed) ...[
               const SizedBox(height: 12),
               TextFormField(
                 controller: _nameCtrl,
@@ -201,8 +227,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             _SelectorField(
               label: 'Dose',
               icon: Icons.medication,
-              valueText: _selectedDose ?? '',
-              onTap: () async {
+              valueText: isSusMed ? widget.initial!.dosage : (_selectedDose ?? ''),
+              onTap: isSusMed ? null : () async {
                 FocusScope.of(context).unfocus();
                 final choice = await _openBottomSheet(context, 'Selecione a dose', _doseOptions);
                 await Future.delayed(const Duration(milliseconds: 100));
@@ -211,7 +237,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 if (choice == null) return;
                 setState(() => _selectedDose = choice);
               },
-              validator: () => _selectedDose == null ? 'Selecione a dose' : null,
+              validator: () => _selectedDose == null && !isSusMed ? 'Selecione a dose' : null,
             ),
             const SizedBox(height: 12),
             _SelectorField(
@@ -387,9 +413,19 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       _showCustomSnackBar('Adicione pelo menos um horário');
       return;
     }
-    // Monta a posologia a partir dos campos fixos
-    _dosageCtrl.text = '${_selectedDose ?? ''} ${_selectedPerDay ?? 1}x ao dia';
-    final medName = _isOtherMed ? _nameCtrl.text.trim() : (_selectedMedName ?? '');
+    
+    final isSusMed = widget.initial?.dispensationId != null;
+
+    // Monta a posologia a partir dos campos fixos (se não for SUS)
+    String finalDosage = widget.initial?.dosage ?? '';
+    String medName = widget.initial?.name ?? '';
+
+    if (!isSusMed) {
+      _dosageCtrl.text = '${_selectedDose ?? ''} ${_selectedPerDay ?? 1}x ao dia';
+      finalDosage = _dosageCtrl.text.trim();
+      medName = _isOtherMed ? _nameCtrl.text.trim() : (_selectedMedName ?? '');
+    }
+    
     if (medName.isEmpty) {
       _showCustomSnackBar('Informe o nome do medicamento');
       return;
@@ -403,9 +439,10 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       final med = Medication(
         id: id,
         name: medName,
-        dosage: _dosageCtrl.text.trim(),
+        dosage: finalDosage,
         times: List.of(_times),
         stockUnits: stock,
+        dispensationId: widget.initial?.dispensationId,
       );
       
       if (widget.initial == null) {
