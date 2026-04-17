@@ -1,6 +1,10 @@
+﻿import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/models/medication.dart';
 import '../core/widgets/app_input_decoration.dart';
@@ -13,7 +17,10 @@ class MaxValueInputFormatter extends TextInputFormatter {
   MaxValueInputFormatter(this.maxValue);
 
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     if (newValue.text.isEmpty) {
       return newValue;
     }
@@ -50,15 +57,37 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final _stockCtrl = TextEditingController();
   final List<TimeOfDayLite> _times = [];
   bool _isSaving = false; // proteção contra cliques múltiplos
+  bool _isLoadingMeds = true;
+
+  Map<String, List<String>> _catalogMap =
+      {}; // Cache do catálogo: ativo -> [doses formatadas]
 
   // Listas pré-definidas
-  final List<String> _medNames = const [
-    'Dipirona', 'Paracetamol', 'Ibuprofeno', 'Amoxicilina', 'Losartana', 'Metformina', 'Omeprazol', 'Outro'
+  List<String> _medNames = const [
+    'Dipirona',
+    'Paracetamol',
+    'Ibuprofeno',
+    'Amoxicilina',
+    'Losartana',
+    'Metformina',
+    'Omeprazol',
+    'Outro',
   ];
-  final List<String> _doseOptions = const [
-    '20 mg', '25 mg', '30 mg', '40 mg', '50 mg', '75 mg', '100 mg',
-    '125 mg', '250 mg', '500 mg', '750 mg', '1 g',
-    '5 ml', '10 ml'
+  List<String> _doseOptions = const [
+    '20 mg',
+    '25 mg',
+    '30 mg',
+    '40 mg',
+    '50 mg',
+    '75 mg',
+    '100 mg',
+    '125 mg',
+    '250 mg',
+    '500 mg',
+    '750 mg',
+    '1 g',
+    '5 ml',
+    '10 ml',
   ];
   final List<int> _perDayOptions = const [1, 2, 3, 4];
 
@@ -77,13 +106,17 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: isError ? colorScheme.errorContainer : colorScheme.primaryContainer,
+        backgroundColor: isError
+            ? colorScheme.errorContainer
+            : colorScheme.primaryContainer,
         duration: const Duration(seconds: 3),
         content: Row(
           children: [
             Icon(
               isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: isError ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer,
+              color: isError
+                  ? colorScheme.onErrorContainer
+                  : colorScheme.onPrimaryContainer,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -92,7 +125,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isError ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer,
+                  color: isError
+                      ? colorScheme.onErrorContainer
+                      : colorScheme.onPrimaryContainer,
                 ),
               ),
             ),
@@ -105,6 +140,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   @override
   void initState() {
     super.initState();
+    _loadMedications();
     final initial = widget.initial;
     if (initial != null) {
       // Nome
@@ -115,15 +151,22 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         _nameCtrl.text = initial.name;
       }
       // Dose (tentativa de parse simples: ex.: "500mg" ou "500 mg" ou "10 ml")
-      final doseMatch = RegExp(r'(\d+)\s*(mg|g|ml)', caseSensitive: false).firstMatch(initial.dosage);
+      final doseMatch = RegExp(
+        r'(\d+)\s*(mg|g|ml)',
+        caseSensitive: false,
+      ).firstMatch(initial.dosage);
       if (doseMatch != null) {
         final num = doseMatch.group(1)!.trim();
         final unit = doseMatch.group(2)!.toLowerCase();
         _selectedDose = '$num $unit';
       }
       // Frequência (ex.: "2x", "2x ao dia", "12/12h" etc)
-      final perDayMatch = RegExp(r'(\d+)x', caseSensitive: false).firstMatch(initial.dosage) ??
-          RegExp(r'(\d+)\s*/\s*\d+\s*h', caseSensitive: false).firstMatch(initial.dosage);
+      final perDayMatch =
+          RegExp(r'(\d+)x', caseSensitive: false).firstMatch(initial.dosage) ??
+          RegExp(
+            r'(\d+)\s*/\s*\d+\s*h',
+            caseSensitive: false,
+          ).firstMatch(initial.dosage);
       if (perDayMatch != null) {
         final n = int.tryParse(perDayMatch.group(1)!);
         if (n != null && _perDayOptions.contains(n)) {
@@ -144,6 +187,124 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     super.dispose();
   }
 
+  void _updateDoseOptions() {
+    if (_selectedMedName != null &&
+        _selectedMedName != 'Outro' &&
+        _catalogMap.containsKey(_selectedMedName)) {
+      setState(() {
+        _doseOptions = _catalogMap[_selectedMedName]!;
+        // Se a dose atual não estiver na nova lista, limpa
+        if (_selectedDose != null && !_doseOptions.contains(_selectedDose)) {
+          _selectedDose = null;
+        }
+      });
+    }
+  }
+
+  Future<void> _loadMedications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const cacheKey = 'medicine_catalog_cache';
+      const cacheTimeKey = 'medicine_catalog_cache_time';
+
+      final cachedJson = prefs.getString(cacheKey);
+      final cacheTime = prefs.getInt(cacheTimeKey) ?? 0;
+      final cacheExpired =
+          DateTime.now().millisecondsSinceEpoch - cacheTime >
+          7 * 24 * 60 * 60 * 1000;
+
+      if (cachedJson != null && !cacheExpired) {
+        debugPrint('[MedicationLoader] Usando cache de medicamentos');
+        final decoded = jsonDecode(cachedJson) as Map<String, dynamic>;
+        _catalogMap = decoded.map(
+          (k, v) => MapEntry(k, (v as List).cast<String>()),
+        );
+      } else {
+        // Busca do Supabase
+        final response = await Supabase.instance.client
+            .from('medicine_catalog')
+            .select('active_principle, strength, form')
+            .order('active_principle');
+
+        final Map<String, List<String>> tempMap = {};
+
+        for (final row in response as List) {
+          final principle = row['active_principle'] as String;
+          final strength = row['strength'] as String;
+          final form = row['form'] as String;
+          final formatted = '$strength ($form)';
+
+          if (!tempMap.containsKey(principle)) {
+            tempMap[principle] = [];
+          }
+          if (!tempMap[principle]!.contains(formatted)) {
+            tempMap[principle]!.add(formatted);
+          }
+        }
+
+        _catalogMap = tempMap;
+
+        // Salva no cache
+        try {
+          await prefs.setString(cacheKey, jsonEncode(_catalogMap));
+          await prefs.setInt(
+            cacheTimeKey,
+            DateTime.now().millisecondsSinceEpoch,
+          );
+        } catch (e) {
+          debugPrint('[MedicationLoader] Erro ao salvar cache: $e');
+        }
+      }
+
+      final names = _catalogMap.keys.toList()..sort();
+      names.add('Outro');
+
+      if (mounted) {
+        setState(() {
+          _medNames = names;
+          _isLoadingMeds = false;
+
+          if (widget.initial != null) {
+            if (_medNames.contains(widget.initial!.name)) {
+              _selectedMedName = widget.initial!.name;
+              _updateDoseOptions();
+              // Tentativa de achar a dose exata do initial no catalog
+              if (_doseOptions.contains(
+                widget.initial!.dosage
+                    .replaceAll(RegExp(r'\s*\d+x ao dia$'), '')
+                    .trim(),
+              )) {
+                _selectedDose = widget.initial!.dosage
+                    .replaceAll(RegExp(r'\s*\d+x ao dia$'), '')
+                    .trim();
+              }
+            } else {
+              _selectedMedName = 'Outro';
+              _nameCtrl.text = widget.initial!.name;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar medicamentos do catálogo: $e');
+      if (mounted) {
+        setState(() {
+          _medNames = [
+            'Dipirona',
+            'Paracetamol',
+            'Ibuprofeno',
+            'Amoxicilina',
+            'Losartana',
+            'Metformina',
+            'Omeprazol',
+            'Outro',
+          ];
+          _isLoadingMeds = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSusMed = widget.initial?.dispensationId != null;
@@ -155,15 +316,18 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.initial == null ? 'Adicionar medicamento' : 'Editar medicamento'),
+          title: Text(
+            widget.initial == null
+                ? 'Adicionar medicamento'
+                : 'Editar medicamento',
+          ),
         ),
         body: Form(
           key: _formKey,
           child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(
-              overscroll: false,
-              scrollbars: false,
-            ),
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(overscroll: false, scrollbars: false),
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -177,13 +341,20 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                        Icon(
+                          Icons.info_outline,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Medicamento do SUS. O nome e a posologia não podem ser alterados.',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -191,164 +362,251 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                       ],
                     ),
                   ),
-            _SelectorField(
+                _SelectorField(
                   label: 'Nome do medicamento',
                   icon: Icons.medical_services_rounded,
-                  valueText: isSusMed ? widget.initial!.name : (_isOtherMed ? 'Outro' : (_selectedMedName ?? '')),
-                  onTap: isSusMed ? null : () async {
-                    FocusScope.of(context).unfocus(); // Fecha o teclado
-                    final choice = await _openBottomSheet(context, 'Selecione o medicamento', _medNames);
-                    // Garante que o foco não retorne após fechar o bottom sheet
+                  valueText: isSusMed
+                      ? widget.initial!.name
+                      : (_isOtherMed ? 'Outro' : (_selectedMedName ?? '')),
+                  onTap: isSusMed
+                      ? null
+                      : () async {
+                          FocusScope.of(context).unfocus(); // Fecha o teclado
+                          if (_isLoadingMeds) {
+                            _showCustomSnackBar(
+                              'Aguarde, carregando lista de medicamentos...',
+                              isError: false,
+                            );
+                            return;
+                          }
+                          final choice = await _openBottomSheet(
+                            context,
+                            'Selecione o medicamento',
+                            _medNames,
+                          );
+                          // Garante que o foco não retorne após fechar o bottom sheet
+                          await Future.delayed(
+                            const Duration(milliseconds: 100),
+                          );
+                          if (!mounted) return;
+                          FocusScope.of(context).unfocus();
+                          if (choice == null) return;
+                          setState(() {
+                            _selectedMedName = choice;
+                            if (!_isOtherMed) {
+                              _nameCtrl.clear();
+                              _updateDoseOptions();
+                            }
+                          });
+                        },
+                  validator: () => _selectedMedName == null && !isSusMed
+                      ? 'Selecione um medicamento'
+                      : null,
+                ),
+                if (_isOtherMed && !isSusMed) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _nameCtrl,
+                    decoration: AppInputDecoration.build(
+                      context,
+                      labelText: 'Outro (digite o nome)',
+                      prefixIcon: Icon(
+                        Icons.edit,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Informe o nome'
+                        : null,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _SelectorField(
+                  label: 'Dose',
+                  icon: Icons.medication,
+                  valueText: isSusMed
+                      ? widget.initial!.dosage
+                      : (_selectedDose ?? ''),
+                  onTap: isSusMed
+                      ? null
+                      : () async {
+                          FocusScope.of(context).unfocus();
+                          final choice = await _openBottomSheet(
+                            context,
+                            'Selecione a dose',
+                            _doseOptions,
+                          );
+                          await Future.delayed(
+                            const Duration(milliseconds: 100),
+                          );
+                          if (!mounted) return;
+                          FocusScope.of(context).unfocus();
+                          if (choice == null) return;
+                          setState(() => _selectedDose = choice);
+                        },
+                  validator: () => _selectedDose == null && !isSusMed
+                      ? 'Selecione a dose'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                _SelectorField(
+                  label: 'Frequência',
+                  icon: Icons.schedule,
+                  focusNode: _freqFocusNode,
+                  errorText: _freqErrorText,
+                  valueText: _selectedPerDay != null
+                      ? _freqLabel(_selectedPerDay!)
+                      : '',
+                  onTap: () async {
+                    FocusScope.of(context).unfocus();
+                    final options = _perDayOptions.map(_freqLabel).toList();
+                    final choice = await _openBottomSheet(
+                      context,
+                      'Selecione a frequência',
+                      options,
+                    );
                     await Future.delayed(const Duration(milliseconds: 100));
                     if (!mounted) return;
                     FocusScope.of(context).unfocus();
                     if (choice == null) return;
+                    final idx = options.indexOf(choice);
                     setState(() {
-                      _selectedMedName = choice;
-                      if (!_isOtherMed) _nameCtrl.clear();
+                      _freqErrorText = null;
+                      _selectedPerDay = _perDayOptions[idx];
+                      if (_selectedPerDay != null &&
+                          _times.length > _selectedPerDay!) {
+                        _times.removeRange(_selectedPerDay!, _times.length);
+                      }
                     });
                   },
-                  validator: () => _selectedMedName == null && !isSusMed ? 'Selecione um medicamento' : null,
-              ),
-            if (_isOtherMed && !isSusMed) ...[
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _nameCtrl,
-                        decoration: AppInputDecoration.build(
-                          context,
-                          labelText: 'Outro (digite o nome)',
-                          prefixIcon:
-                              Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
-                        ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o nome' : null,
-              ),
-            ],
-            const SizedBox(height: 12),
-            _SelectorField(
-              label: 'Dose',
-              icon: Icons.medication,
-              valueText: isSusMed ? widget.initial!.dosage : (_selectedDose ?? ''),
-              onTap: isSusMed ? null : () async {
-                FocusScope.of(context).unfocus();
-                final choice = await _openBottomSheet(context, 'Selecione a dose', _doseOptions);
-                await Future.delayed(const Duration(milliseconds: 100));
-                if (!mounted) return;
-                FocusScope.of(context).unfocus();
-                if (choice == null) return;
-                setState(() => _selectedDose = choice);
-              },
-              validator: () => _selectedDose == null && !isSusMed ? 'Selecione a dose' : null,
-            ),
-            const SizedBox(height: 12),
-            _SelectorField(
-              label: 'Frequência',
-              icon: Icons.schedule,
-              focusNode: _freqFocusNode,
-              errorText: _freqErrorText,
-              valueText: _selectedPerDay != null ? _freqLabel(_selectedPerDay!) : '',
-              onTap: () async {
-                FocusScope.of(context).unfocus();
-                final options = _perDayOptions.map(_freqLabel).toList();
-                final choice = await _openBottomSheet(context, 'Selecione a frequência', options);
-                await Future.delayed(const Duration(milliseconds: 100));
-                if (!mounted) return;
-                FocusScope.of(context).unfocus();
-                if (choice == null) return;
-                final idx = options.indexOf(choice);
-                setState(() {
-                  _freqErrorText = null;
-                  _selectedPerDay = _perDayOptions[idx];
-                  if (_selectedPerDay != null && _times.length > _selectedPerDay!) {
-                    _times.removeRange(_selectedPerDay!, _times.length);
-                  }
-                });
-              },
-              validator: () => _selectedPerDay == null ? 'Selecione a frequência' : null,
-            ),
-            const SizedBox(height: 12),
-            _SelectorField(
-              label: 'Adicionar horário',
-              icon: Icons.access_time,
-              valueText: '',
-              onTap: _pickTime,
-              validator: () => _times.isEmpty ? 'Adicione pelo menos um horário' : null,
-            ),
-            if (_times.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _times
-                      .asMap()
-                      .entries
-                      .map((e) => Chip(
-                            label: Text(_fmt(e.value)),
-                            onDeleted: () => setState(() => _times.removeAt(e.key)),
-                          ))
-                      .toList(),
+                  validator: () =>
+                      _selectedPerDay == null ? 'Selecione a frequência' : null,
                 ),
-              ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _stockCtrl,
-              decoration: AppInputDecoration.build(
-                context,
-                labelText: 'Estoque inicial (unidades)',
-                prefixIcon:
-                    Icon(Icons.inventory, color: Theme.of(context).colorScheme.primary),
-              ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                MaxValueInputFormatter(120), // Limita automaticamente a 120
+                const SizedBox(height: 12),
+                _SelectorField(
+                  label: 'Adicionar horário',
+                  icon: Icons.access_time,
+                  valueText: '',
+                  onTap: _pickTime,
+                  validator: () {
+                    if (isSusMed) {
+                      return _times.isEmpty
+                          ? 'Adicione pelo menos um horário'
+                          : null;
+                    }
+                    if (_selectedPerDay != null &&
+                        _times.length != _selectedPerDay!) {
+                      return 'Adicione exatamente $_selectedPerDay horário(s)';
+                    }
+                    if (_times.isEmpty) return 'Adicione pelo menos um horário';
+                    return null;
+                  },
+                ),
+                if (_times.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _times
+                          .asMap()
+                          .entries
+                          .map(
+                            (e) => Chip(
+                              label: Text(_fmt(e.value)),
+                              onDeleted: () =>
+                                  setState(() => _times.removeAt(e.key)),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _stockCtrl,
+                  decoration: AppInputDecoration.build(
+                    context,
+                    labelText: 'Estoque inicial (unidades)',
+                    prefixIcon: Icon(
+                      Icons.inventory,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    MaxValueInputFormatter(120), // Limita automaticamente a 120
+                  ],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty)
+                      return 'Informe o estoque inicial';
+                    final n = int.tryParse(v);
+                    if (n == null || n < 0) return 'Informe um número válido';
+                    if (n > 120) return 'Estoque máximo: 120 unidades';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: Size(
+                      double.infinity,
+                      48 *
+                          (Theme.of(context).textTheme.bodyMedium?.fontSize ??
+                              18) /
+                          18,
+                    ),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onPrimaryContainer,
+                  ),
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? SizedBox(
+                          height: Theme.of(context).iconTheme.size ?? 24,
+                          width: Theme.of(context).iconTheme.size ?? 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
+                          ),
+                        )
+                      : Text(
+                          'Salvar',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                ),
               ],
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Informe o estoque inicial';
-                final n = int.tryParse(v);
-                if (n == null || n < 0) return 'Informe um número válido';
-                if (n > 120) return 'Estoque máximo: 120 unidades';
-                return null;
-              },
             ),
-            const SizedBox(height: 24),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: Size(double.infinity, 48 * (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 18) / 18),
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-              onPressed: _isSaving ? null : _save,
-              child: _isSaving
-                  ? SizedBox(
-                      height: Theme.of(context).iconTheme.size ?? 24,
-                      width: Theme.of(context).iconTheme.size ?? 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    )
-                  : Text('Salvar', style: Theme.of(context).textTheme.labelLarge),
-            )
-          ],
+          ),
         ),
-        ),
-      ),
       ),
     );
   }
 
   Future<void> _pickTime() async {
-    if (_selectedPerDay == null) {
-      setState(() => _freqErrorText = 'Defina a frequência primeiro');
-      _freqFocusNode.requestFocus();
-      return;
-    }
-    
-    if (_times.length >= _selectedPerDay!) {
-      setState(() => _freqErrorText = 'Limite de $_selectedPerDay horário(s) atingido');
-      _freqFocusNode.requestFocus();
-      return;
+    FocusScope.of(context).unfocus(); // Retira o foco de qualquer campo ativo
+    final isSusMed = widget.initial?.dispensationId != null;
+
+    if (!isSusMed) {
+      if (_selectedPerDay == null) {
+        setState(() => _freqErrorText = 'Defina a frequência primeiro');
+        _freqFocusNode.requestFocus();
+        return;
+      }
+
+      if (_times.length >= _selectedPerDay!) {
+        setState(
+          () =>
+              _freqErrorText = 'Limite de $_selectedPerDay horário(s) atingido',
+        );
+        _freqFocusNode.requestFocus();
+        return;
+      }
     }
 
     final t = await showTimePicker(
@@ -364,12 +622,14 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 EditableTextState? editable;
                 void findEditable(Element element) {
                   if (editable != null) return;
-                  if (element is StatefulElement && element.state is EditableTextState) {
+                  if (element is StatefulElement &&
+                      element.state is EditableTextState) {
                     editable = element.state as EditableTextState;
                   } else {
                     element.visitChildren(findEditable);
                   }
                 }
+
                 node.context!.visitChildElements(findEditable);
                 if (editable != null) {
                   final text = editable!.textEditingValue.text;
@@ -388,10 +648,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       },
     );
     if (t == null) return;
-    
+
     final lite = TimeOfDayLite(t.hour, t.minute);
-    final alreadyExists = _times.any((time) => time.hour == lite.hour && time.minute == lite.minute);
-    
+    final alreadyExists = _times.any(
+      (time) => time.hour == lite.hour && time.minute == lite.minute,
+    );
+
     if (alreadyExists) {
       _showCustomSnackBar('Este horário já foi adicionado');
       return;
@@ -399,42 +661,76 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
     setState(() {
       _times.add(lite);
-      _times.sort((a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute);
+
+      // Auto preenchimento dos demais horários baseados no primeiro escolhido
+      if (!isSusMed &&
+          _selectedPerDay != null &&
+          _selectedPerDay! > 1 &&
+          _times.length == 1) {
+        final interval = 24 ~/ _selectedPerDay!;
+        for (int i = 1; i < _selectedPerDay!; i++) {
+          final nextHour = (lite.hour + (interval * i)) % 24;
+          final nextLite = TimeOfDayLite(nextHour, lite.minute);
+          if (!_times.any(
+            (time) =>
+                time.hour == nextLite.hour && time.minute == nextLite.minute,
+          )) {
+            _times.add(nextLite);
+          }
+        }
+      }
+
+      _times.sort(
+        (a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute,
+      );
     });
   }
 
   String _fmt(TimeOfDayLite t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}' ;
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   Future<void> _save() async {
     if (_isSaving) return; // Evita cliques múltiplos
     if (!_formKey.currentState!.validate()) return;
-    if (_times.isEmpty) {
+
+    final isSusMed = widget.initial?.dispensationId != null;
+
+    if (!isSusMed) {
+      if (_selectedPerDay == null) {
+        _showCustomSnackBar('Selecione a frequência');
+        return;
+      }
+      if (_times.length != _selectedPerDay!) {
+        _showCustomSnackBar('Adicione exatamente $_selectedPerDay horário(s)');
+        return;
+      }
+    } else if (_times.isEmpty) {
       _showCustomSnackBar('Adicione pelo menos um horário');
       return;
     }
-    
-    final isSusMed = widget.initial?.dispensationId != null;
 
     // Monta a posologia a partir dos campos fixos (se não for SUS)
     String finalDosage = widget.initial?.dosage ?? '';
     String medName = widget.initial?.name ?? '';
 
     if (!isSusMed) {
-      _dosageCtrl.text = '${_selectedDose ?? ''} ${_selectedPerDay ?? 1}x ao dia';
+      _dosageCtrl.text =
+          '${_selectedDose ?? ''} ${_selectedPerDay ?? 1}x ao dia';
       finalDosage = _dosageCtrl.text.trim();
       medName = _isOtherMed ? _nameCtrl.text.trim() : (_selectedMedName ?? '');
     }
-    
+
     if (medName.isEmpty) {
       _showCustomSnackBar('Informe o nome do medicamento');
       return;
     }
-    
+
     setState(() => _isSaving = true); // Bloqueia botão
-    
+
     try {
-      final id = widget.initial?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+      final id =
+          widget.initial?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString();
       final stock = int.parse(_stockCtrl.text.trim());
       final med = Medication(
         id: id,
@@ -444,7 +740,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         stockUnits: stock,
         dispensationId: widget.initial?.dispensationId,
       );
-      
+
       if (widget.initial == null) {
         await context.read<AppState>().addMedication(med);
       } else {
@@ -458,14 +754,18 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       }
       return;
     }
-    
+
     // Navegação só acontece se não houver erro
     if (mounted) {
       Navigator.of(context).pop(widget.initial == null ? 'added' : 'updated');
     }
   }
 
-  Future<String?> _openBottomSheet(BuildContext context, String title, List<String> options) async {
+  Future<String?> _openBottomSheet(
+    BuildContext context,
+    String title,
+    List<String> options,
+  ) async {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -477,7 +777,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ListTile(title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold))),
+                ListTile(
+                  title: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
                 const Divider(height: 1),
                 Flexible(
                   child: ListView.builder(
@@ -556,3 +861,4 @@ class _SelectorField extends StatelessWidget {
     );
   }
 }
+

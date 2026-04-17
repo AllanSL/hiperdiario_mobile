@@ -475,70 +475,46 @@ class _AcknowledgeDispensationSheet extends StatefulWidget {
 }
 
 class _AcknowledgeDispensationSheetState extends State<_AcknowledgeDispensationSheet> {
-  final List<TimeOfDayLite> _times = [];
-  final List<int> _perDayOptions = const [1, 2, 3, 4];
-  int? _selectedPerDay;
   bool _isSaving = false;
 
-  void _pickTime() async {
-    if (_selectedPerDay == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione a frequência primeiro')),
-      );
-      return;
-    }
-    
-    if (_times.length >= _selectedPerDay!) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Limite de $_selectedPerDay horário(s) atingido')),
-      );
-      return;
-    }
-
-    final t = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 0, minute: 0),
-    );
-    if (t == null) return;
-    
-    final lite = TimeOfDayLite(t.hour, t.minute);
-    if (_times.any((time) => time.hour == lite.hour && time.minute == lite.minute)) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Horário já adicionado')));
-      return;
-    }
-
-    setState(() {
-      _times.add(lite);
-      _times.sort((a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute);
-    });
-  }
-
   void _save() async {
-    if (_times.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Adicione pelo menos um horário')));
-      return;
+    final d = widget.dispensation;
+    
+    final times = <TimeOfDayLite>[];
+    for (final timeStr in d.scheduledTimes) {
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        final h = int.tryParse(parts[0]) ?? 0;
+        final m = int.tryParse(parts[1]) ?? 0;
+        times.add(TimeOfDayLite(h, m));
+      }
     }
-    
+
     setState(() => _isSaving = true);
-    
-    final finalDosage = '${widget.dispensation.form} ${_selectedPerDay ?? 1}x ao dia';
-    
+
+    final freqStr = d.frequencyLabel ?? '${d.frequencyPerDay}x ao dia';
+    final finalDosage = '${d.strength} (${d.form}) $freqStr';
+
     try {
       await context.read<AppState>().acknowledgeDispensation(
-        widget.dispensation, 
-        _times,
+        widget.dispensation,
+        times,
         finalDosage,
       );
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Medicamento do SUS adicionado e alarmes configurados!')),
+          const SnackBar(
+            content: Text('Medicamento da UBS sincronizado e alarmes ativados!'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
       }
     }
   }
@@ -547,6 +523,9 @@ class _AcknowledgeDispensationSheetState extends State<_AcknowledgeDispensationS
   Widget build(BuildContext context) {
     final d = widget.dispensation;
 
+    final freqStr = d.frequencyLabel ?? '${d.frequencyPerDay}x ao dia';
+    final horariosStr = d.scheduledTimes.join(' - ');
+
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -554,56 +533,32 @@ class _AcknowledgeDispensationSheetState extends State<_AcknowledgeDispensationS
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Configurar medicamento',
+            'Configurar medicamento do SUS',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Text('${d.activePrinciple} ${d.strength} - ${d.dispensedQuantity} un. recebidas.'),
+          Text('${d.activePrinciple} - ${d.dispensedQuantity} un. recebidas.'),
           const SizedBox(height: 24),
-          DropdownButtonFormField<int>(
-            decoration: InputDecoration(
-              labelText: 'Frequência (vezes ao dia)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            initialValue: _selectedPerDay,
-            items: _perDayOptions.map((n) => DropdownMenuItem(
-              value: n,
-              child: Text(n == 1 ? '1 vez ao dia' : '$n vezes ao dia'),
-            )).toList(),
-            onChanged: (v) {
-              setState(() {
-                _selectedPerDay = v;
-                if (v != null && _times.length > v) {
-                  _times.removeRange(v, _times.length);
-                }
-              });
-            },
+          Text(
+            'Frequência indicada: $freqStr',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.add_alarm),
-            label: const Text('Adicionar horário'),
-            onPressed: _pickTime,
-          ),
-          if (_times.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12.0),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _times.map((t) => Chip(
-                  label: Text('${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'),
-                  onDeleted: () => setState(() => _times.remove(t)),
-                )).toList(),
-              ),
+          if (horariosStr.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Horários pré-definidos: $horariosStr',
+              style: const TextStyle(fontSize: 14),
             ),
+          ],
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: _isSaving ? null : _save,
+            onPressed: (_isSaving || d.scheduledTimes.isEmpty) ? null : _save,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
             ),
-            child: _isSaving ? const CircularProgressIndicator() : const Text('Salvar na minha lista'),
+            child: _isSaving
+                ? const CircularProgressIndicator(color: Colors.white)
+                : Text(d.scheduledTimes.isEmpty ? 'Nenhum horário definido na UBS' : 'Aceitar e Configurar Alarmes'),
           ),
         ],
       ),

@@ -88,15 +88,7 @@ create table if not exists cnes_establishments (
 );
 create index if not exists idx_cnes_cnesid on cnes_establishments (cnes_id);
 
--- Tabela de municipios (cache)
-create table if not exists municipios (
-  id bigserial primary key,
-  ibge_id bigint unique,
-  name text,
-  uf text,
-  last_updated timestamptz default now()
-);
-create index if not exists idx_municipios_uf on municipios (uf);
+
 
 -- Recuperação de senha
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -257,8 +249,6 @@ CREATE TABLE IF NOT EXISTS medicine_dispensations (
   catalog_id uuid REFERENCES medicine_catalog(id),
   ubs_cnes text NOT NULL,                    
   dispensed_quantity integer NOT NULL,       
-  prescribing_doctor text NOT NULL,          
-  prescription_date date NOT NULL,           
-  dispensed_at timestamptz DEFAULT now(),
-  acknowledged_in_app boolean DEFAULT false
-);
+    frequency_label text,
+    scheduled_times jsonb,
+

@@ -1,4 +1,5 @@
-﻿import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/services/notification_service.dart';
@@ -27,12 +28,14 @@ class AppState extends ChangeNotifier {
   int get lowStockDaysThreshold => _lowStockDaysThreshold;
 
   final SupabaseClient _supabase = Supabase.instance.client;
+  Timer? _syncTimer;
 
   AppState() {
     // Check initial session
     _isLogged = _supabase.auth.currentSession != null;
     if (_isLogged) {
       _loadDataAndSchedule();
+      _startSyncTimer();
     }
 
     // Listen to auth changes
@@ -48,18 +51,38 @@ class AppState extends ChangeNotifier {
           _appointments = [];
           _medications = [];
           _pendingDispensations = [];
+          _stopSyncTimer();
         } else {
           _loadDataAndSchedule();
+          _startSyncTimer();
         }
         notifyListeners();
       }
     });
   }
 
+  void _startSyncTimer() {
+    _stopSyncTimer();
+    _syncTimer = Timer.periodic(const Duration(minutes: 10), (_) {
+      _loadDataAndSchedule();
+    });
+  }
+
+  void _stopSyncTimer() {
+    _syncTimer?.cancel();
+    _syncTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _stopSyncTimer();
+    super.dispose();
+  }
+
   Future<void> loginWithCpfPassword(String cpf, String password) async {
     final cleanCpf = cpf.replaceAll(RegExp(r'\D'), '');
     if (!_isValidCpf(cleanCpf)) {
-      throw Exception('CPF inválido. Verifique e tente novamente.');
+      throw Exception('CPF inv�lido. Verifique e tente novamente.');
     }
     final email = _cpfToEmail(cleanCpf);
     await _supabase.auth.signInWithPassword(email: email, password: password);
@@ -84,7 +107,7 @@ class AppState extends ChangeNotifier {
   }) async {
     final cleanCpf = cpf.replaceAll(RegExp(r'\D'), '');
     if (!_isValidCpf(cleanCpf)) {
-      throw Exception('CPF inválido. Verifique e tente novamente.');
+      throw Exception('CPF inv�lido. Verifique e tente novamente.');
     }
     final authEmail = _cpfToEmail(cleanCpf);
 
@@ -110,14 +133,14 @@ class AppState extends ChangeNotifier {
         } on AuthException catch (signInError) {
           if (signInError.code == 'invalid_credentials') {
             throw Exception(
-              'CPF já cadastrado. Faça login ou recupere a senha.',
+              'CPF j� cadastrado. Fa�a login ou recupere a senha.',
             );
           }
           rethrow;
         }
         final existingUserId = _supabase.auth.currentUser?.id;
         if (existingUserId == null) {
-          throw Exception('Não foi possível obter o usuário após login');
+          throw Exception('N�o foi poss�vel obter o usu�rio ap�s login');
         }
         await _upsertUserProfile(
           userId: existingUserId,
@@ -147,7 +170,7 @@ class AppState extends ChangeNotifier {
 
     final userId = signUpResponse.user?.id ?? _supabase.auth.currentUser?.id;
     if (userId == null) {
-      throw Exception('Não foi possível obter o usuário após cadastro');
+      throw Exception('N�o foi poss�vel obter o usu�rio ap�s cadastro');
     }
 
     await _upsertUserProfile(
@@ -194,7 +217,7 @@ class AppState extends ChangeNotifier {
       return response as String?;
     } catch (e) {
       throw Exception(
-        'Dados não encontrados ou ocorreu um erro. Verifique e tente novamente.',
+        'Dados n�o encontrados ou ocorreu um erro. Verifique e tente novamente.',
       );
     }
   }
@@ -231,7 +254,7 @@ class AppState extends ChangeNotifier {
             'p_data_nascimento': parsedDate,
         },
       );
-      // Após sucesso, o usuário poderá fazer o login normalmente com a nova senha
+      // Ap�s sucesso, o usu�rio poder� fazer o login normalmente com a nova senha
     } on PostgrestException catch (e) {
       throw Exception(e.message);
     } catch (e) {
@@ -274,7 +297,7 @@ class AppState extends ChangeNotifier {
         'name': emergencyName,
         'phone': emergencyPhone,
         'relationship': emergencyRelationship.isEmpty
-            ? 'Contato de emergência'
+            ? 'Contato de emerg�ncia'
             : emergencyRelationship,
       };
     }
@@ -312,7 +335,7 @@ class AppState extends ChangeNotifier {
 
     if (existingByRemote != null) {
       if (!allowUpdateExisting) {
-        throw Exception('CPF já cadastrado. Faça login ou recupere a senha.');
+        throw Exception('CPF j� cadastrado. Fa�a login ou recupere a senha.');
       }
       await _supabase
           .from('users')
@@ -329,7 +352,7 @@ class AppState extends ChangeNotifier {
           .eq('cpf', cpf)
           .maybeSingle();
       if (existingByCpf != null) {
-        throw Exception('CPF já cadastrado. Faça login ou recupere a senha.');
+        throw Exception('CPF j� cadastrado. Fa�a login ou recupere a senha.');
       }
     }
 
@@ -387,7 +410,7 @@ class AppState extends ChangeNotifier {
   Future<bool> cpfExists(String cpf) async {
     final cleanCpf = cpf.replaceAll(RegExp(r'\D'), '');
     if (!_isValidCpf(cleanCpf)) {
-      throw Exception('CPF inválido. Verifique e tente novamente.');
+      throw Exception('CPF inv�lido. Verifique e tente novamente.');
     }
     final existing = await _supabase
         .from('users')
@@ -492,6 +515,99 @@ class AppState extends ChangeNotifier {
       _appointments = [];
     }
 
+    // --- INÍCIO DA SINCRONIZAÇÃO PONTO 2, 3 e 4 (SUS) ---
+    if (profileId != null) {
+      try {
+        final allDispsRows = await _supabase
+            .from('medicine_dispensations')
+            .select('id, dispensed_quantity, scheduled_times')
+            .eq('patient_id', profileId);
+
+        final validDisps = <String, Map<String, dynamic>>{};
+        for (final row in allDispsRows as List) {
+          validDisps[row['id'].toString()] = row as Map<String, dynamic>;
+        }
+
+        final medsToCheck = await _supabase
+            .from('medications')
+            .select('id, dispensation_id, frequency, stock')
+            .eq('owner_id', user.id)
+            .eq('active', true)
+            .not('dispensation_id', 'is', null);
+
+        for (final medRow in medsToCheck as List) {
+          final mId = medRow['id'].toString();
+          final dId = medRow['dispensation_id']?.toString();
+
+          if (dId != null && dId.isNotEmpty) {
+            if (!validDisps.containsKey(dId)) {
+              await _supabase
+                  .from('medications')
+                  .update({'active': false})
+                  .eq('id', mId);
+            } else {
+              final updateMap = <String, dynamic>{};
+              final dispData = validDisps[dId]!;
+
+              final webTimesRaw = dispData['scheduled_times'];
+              final newTimes = <String>[];
+              if (webTimesRaw is List) {
+                 for (final t in webTimesRaw) {
+                   newTimes.add(t.toString());
+                 }
+              }
+
+              bool timesChanged = false;
+              final freqRaw = medRow['frequency'];
+              final currentTimes = <String>[];
+              if (freqRaw is List) {
+                for (final item in freqRaw) {
+                  if (item is String) currentTimes.add(item);
+                }
+              } else if (freqRaw is Map && freqRaw['times'] is List) {
+                for (final item in (freqRaw['times'] as List)) {
+                  if (item is String) currentTimes.add(item);
+                }
+              }
+
+              if (newTimes.length != currentTimes.length) {
+                timesChanged = true;
+              } else {
+                for (int i = 0; i < newTimes.length; i++) {
+                  if (newTimes[i] != currentTimes[i]) {
+                    timesChanged = true;
+                    break;
+                  }
+                }
+              }
+
+              final webStockRaw = dispData['dispensed_quantity'];
+              final int webStock = int.tryParse(webStockRaw?.toString() ?? '0') ?? 0;
+              final currentStockRaw = medRow['stock'];
+              final int currentStock = int.tryParse(currentStockRaw?.toString() ?? '0') ?? 0;
+
+              if (timesChanged && newTimes.isNotEmpty) {
+                updateMap['frequency'] = newTimes;
+              }
+              if (webStock != currentStock) {
+                updateMap['stock'] = webStock;
+              }
+
+              if (updateMap.isNotEmpty) {
+                await _supabase
+                    .from('medications')
+                    .update(updateMap)
+                    .eq('id', mId);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Erro ao sincronizar retornos da UBS: ');
+      }
+    }
+    // --- FIM DA SINCRONIZAÇÃO PONTO 2, 3 e 4 (SUS) ---
+
     final medicationRows = await _supabase
         .from('medications')
         .select('*')
@@ -505,24 +621,36 @@ class AppState extends ChangeNotifier {
     if (profileId != null) {
       try {
         final pendingRows = await _supabase
-            .from('medicine_dispensations')
-            .select('id, dispensed_quantity, dispensed_at, prescribing_doctor, medicine_catalog ( active_principle, strength, form )')
-            .eq('patient_id', profileId)
-            .eq('acknowledged_in_app', false);
-            
-        _pendingDispensations = (pendingRows as List).map((row) {
-          final map = row as Map<String, dynamic>;
-          final catalog = map['medicine_catalog'] as Map<String, dynamic>? ?? {};
-          return PendingDispensation(
-            id: map['id'].toString(),
-            activePrinciple: catalog['active_principle']?.toString() ?? 'Medicamento Local',
-            strength: catalog['strength']?.toString() ?? '',
-            form: catalog['form']?.toString() ?? '',
-            dispensedQuantity: int.tryParse(map['dispensed_quantity']?.toString() ?? '0') ?? 0,
-            dispensedAt: DateTime.tryParse(map['dispensed_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
-            prescribingDoctor: map['prescribing_doctor']?.toString() ?? 'Não informado',
-          );
-        }).toList();
+              .from('medicine_dispensations')
+              .select('id, dispensed_quantity, dispensed_at, prescribing_doctor, frequency_per_day, frequency_label, scheduled_times, medicine_catalog ( active_principle, strength, form )')
+              .eq('patient_id', profileId)
+              .eq('acknowledged_in_app', false);
+
+          _pendingDispensations = (pendingRows as List).map((row) {
+            final map = row as Map<String, dynamic>;
+            final catalog = map['medicine_catalog'] as Map<String, dynamic>? ?? {};
+
+            final timesRaw = map['scheduled_times'];
+            final timesList = <String>[];
+            if (timesRaw is List) {
+              for (final t in timesRaw) {
+                timesList.add(t.toString());
+              }
+            }
+
+            return PendingDispensation(
+              id: map['id'].toString(),
+              activePrinciple: catalog['active_principle']?.toString() ?? 'Medicamento Local',
+              strength: catalog['strength']?.toString() ?? '',
+              form: catalog['form']?.toString() ?? '',
+              dispensedQuantity: int.tryParse(map['dispensed_quantity']?.toString() ?? '0') ?? 0,
+              dispensedAt: DateTime.tryParse(map['dispensed_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
+              prescribingDoctor: map['prescribing_doctor']?.toString() ?? 'Não informado',
+              frequencyPerDay: int.tryParse(map['frequency_per_day']?.toString() ?? '1') ?? 1,
+              frequencyLabel: map['frequency_label']?.toString(),
+              scheduledTimes: timesList,
+            );
+          }).toList();
       } catch (e) {
         debugPrint('Erro ao buscar retiradas pendentes de medicamento: $e');
         _pendingDispensations = [];
@@ -533,10 +661,10 @@ class AppState extends ChangeNotifier {
 
     notifyListeners();
 
-    // Cancela todas as notificações antigas e reagenda
+    // Cancela todas as notifica��es antigas e reagenda
     await NotificationService.instance.cancelAll();
 
-    // Agenda notificações conforme RF04 e RF07
+    // Agenda notifica��es conforme RF04 e RF07
     for (final appt in _appointments) {
       await NotificationService.instance.scheduleAppointmentReminders(appt);
     }
@@ -613,21 +741,21 @@ class AppState extends ChangeNotifier {
           name: emergencyName,
           phone: emergencyPhone,
           relationship: emergencyRelationship.isEmpty
-              ? 'Contato de emergência'
+              ? 'Contato de emerg�ncia'
               : emergencyRelationship,
         );
       }
     }
 
     return Patient(
-      name: (row?['name'] ?? metadata['full_name'] ?? 'Usuário').toString(),
+      name: (row?['name'] ?? metadata['full_name'] ?? 'Usu�rio').toString(),
       cpf: (row?['cpf'] ?? metadata['cpf'] ?? cpfFallback).toString(),
       birthDate: birthDate,
       diseases: diseases,
       contact: (row?['phone'] ?? '').toString(),
       ubs: row?['ubs_cnes']?.toString().isNotEmpty == true
           ? row!['ubs_cnes'].toString()
-          : 'UBS não informada',
+          : 'UBS n�o informada',
       ubsName: ubsName,
       email: (row?['email'] ?? email)?.toString(),
       emergencyContact: emergencyContact,
@@ -654,7 +782,7 @@ class AppState extends ChangeNotifier {
     return Appointment(
       id: (row['remote_id'] ?? row['id']).toString(),
       dateTime: dateTime,
-      location: (row['location'] ?? 'Local não informado').toString(),
+      location: (row['location'] ?? 'Local n�o informado').toString(),
       specialty: (row['specialty'] ?? 'Consulta').toString(),
       notes: row['notes']?.toString(),
       attended: attended,
@@ -723,7 +851,7 @@ class AppState extends ChangeNotifier {
     final user = _supabase.auth.currentUser;
     if (user != null && _patient != null) {
       try {
-        // Usa o CPF do paciente que já está garantido e com fallback correto
+        // Usa o CPF do paciente que j� est� garantido e com fallback correto
         final profile = await _supabase
             .from('users')
             .select('id')
@@ -747,7 +875,7 @@ class AppState extends ChangeNotifier {
           await _supabase.from('appointments').insert(doc);
         } else {
           debugPrint(
-            'Falha: usuário não encontrado na tabela para associar a consulta.',
+            'Falha: usu�rio n�o encontrado na tabela para associar a consulta.',
           );
         }
       } catch (e) {
@@ -760,7 +888,7 @@ class AppState extends ChangeNotifier {
     try {
       await NotificationService.instance.scheduleAppointmentReminders(appt);
     } catch (e) {
-      // Ignora erro de notificações - não deve impedir salvamento
+      // Ignora erro de notifica��es - n�o deve impedir salvamento
     }
   }
 
@@ -768,11 +896,11 @@ class AppState extends ChangeNotifier {
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
-        // Tenta atualizar usando primeiramente o remote_id se existir, caso não, por safety pode tentar id numérico se for DB id.
+        // Tenta atualizar usando primeiramente o remote_id se existir, caso n�o, por safety pode tentar id num�rico se for DB id.
         final targetId = appt.id;
         final isNumeric =
             int.tryParse(targetId) != null && targetId.length < 13;
-        // Heurística p/ identificar id sequencial gerado pelo Supabase versus timestamp/UUID
+        // Heur�stica p/ identificar id sequencial gerado pelo Supabase versus timestamp/UUID
 
         final doc = {
           'date_time': appt.dateTime.toUtc().toIso8601String(),
@@ -803,7 +931,7 @@ class AppState extends ChangeNotifier {
         .map((e) => e.id == appt.id ? appt : e)
         .toList();
     notifyListeners();
-    // Cancela e reagenda todas as notificações
+    // Cancela e reagenda todas as notifica��es
     try {
       await NotificationService.instance.cancelAll();
       for (final a in _appointments) {
@@ -813,7 +941,7 @@ class AppState extends ChangeNotifier {
         await NotificationService.instance.scheduleMedicationReminders(med);
       }
     } catch (e) {
-      // Ignora erro de notificações
+      // Ignora erro de notifica��es
     }
   }
 
@@ -834,7 +962,7 @@ class AppState extends ChangeNotifier {
 
     _appointments = _appointments.where((e) => e.id != id).toList();
     notifyListeners();
-    // Cancela e reagenda notificações restantes
+    // Cancela e reagenda notifica��es restantes
     try {
       await NotificationService.instance.cancelAll();
       for (final a in _appointments) {
@@ -844,7 +972,7 @@ class AppState extends ChangeNotifier {
         await NotificationService.instance.scheduleMedicationReminders(med);
       }
     } catch (e) {
-      // Ignora erro de notificações
+      // Ignora erro de notifica��es
     }
   }
 
@@ -886,7 +1014,7 @@ class AppState extends ChangeNotifier {
   }) async {
     if (_patient == null) return;
 
-    // Preparar os dados para atualização no Supabase
+    // Preparar os dados para atualiza��o no Supabase
     final payload = <String, dynamic>{};
     if (contact != null) payload['phone'] = contact;
     if (ubs != null) payload['ubs_cnes'] = ubs;
@@ -906,7 +1034,7 @@ class AppState extends ChangeNotifier {
       try {
         await _supabase.from('users').update(payload).eq('cpf', _patient!.cpf);
       } catch (e) {
-        // Log ou re-throw dependendo da necessidade de UI, mas como é um app state
+        // Log ou re-throw dependendo da necessidade de UI, mas como � um app state
         debugPrint('Erro ao atualizar contatos no Supabase: $e');
         rethrow;
       }
@@ -923,7 +1051,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // === Localização do paciente ===
+  // === Localiza��o do paciente ===
 
   Future<void> updatePatientLocation({
     required int codigoUf,
@@ -939,7 +1067,7 @@ class AppState extends ChangeNotifier {
           .update({'uf': siglaUf, 'municipio_ibge': codigoMunicipio})
           .eq('cpf', _patient!.cpf);
     } catch (e) {
-      debugPrint('Erro ao atualizar localizaÃ§Ã£o no Supabase: $e');
+      debugPrint('Erro ao atualizar localização no Supabase: $e');
     }
 
     _patient = _patient!.copyWith(
@@ -980,7 +1108,7 @@ class AppState extends ChangeNotifier {
     try {
       await NotificationService.instance.scheduleMedicationReminders(m);
     } catch (e) {
-      // Ignora erro de notificações - não deve impedir salvamento
+      // Ignora erro de notifica��es - n�o deve impedir salvamento
     }
   }
 
@@ -1063,14 +1191,14 @@ class AppState extends ChangeNotifier {
 
     _medications = _medications.map((e) => e.id == m.id ? m : e).toList();
     notifyListeners();
-    // Para simplificar, cancela e reagenda todos os lembretes de medicação
+    // Para simplificar, cancela e reagenda todos os lembretes de medica��o
     try {
       await NotificationService.instance.cancelAll();
       for (final med in _medications) {
         await NotificationService.instance.scheduleMedicationReminders(med);
       }
     } catch (e) {
-      // Ignora erro de notificações - não deve impedir salvamento
+      // Ignora erro de notifica��es - n�o deve impedir salvamento
     }
   }
 
@@ -1106,7 +1234,7 @@ class AppState extends ChangeNotifier {
         await NotificationService.instance.scheduleMedicationReminders(med);
       }
     } catch (e) {
-      // Ignora erro de notificações - não deve impedir remoção
+      // Ignora erro de notifica��es - n�o deve impedir remo��o
     }
   }
 

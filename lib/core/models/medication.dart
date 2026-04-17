@@ -30,6 +30,9 @@ class PendingDispensation {
   final int dispensedQuantity;
   final DateTime dispensedAt;
   final String prescribingDoctor;
+  final int frequencyPerDay;
+  final String? frequencyLabel;
+  final List<String> scheduledTimes;
 
   PendingDispensation({
     required this.id,
@@ -39,5 +42,8 @@ class PendingDispensation {
     required this.dispensedQuantity,
     required this.dispensedAt,
     required this.prescribingDoctor,
+    required this.frequencyPerDay,
+    this.frequencyLabel,
+    this.scheduledTimes = const [],
   });
 }

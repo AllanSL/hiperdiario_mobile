@@ -6,8 +6,6 @@ import '../core/providers/theme_provider.dart';
 import 'appointments_page.dart';
 import 'appointment_history_page.dart';
 import 'medications_page.dart';
-import 'supabase_medications_page.dart';
-import 'supabase_auth_page.dart';
 import 'profile_page.dart';
 import 'add_medication_page.dart';
 import 'add_appointment_page.dart';
@@ -185,8 +183,29 @@ class _HomePageState extends State<HomePage> {
         children: pages,
       ),
       floatingActionButton: _index == 1
-          ? FloatingActionButton.extended(
-              onPressed: () async {
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'btnSyncMed',
+                  tooltip: 'Atualizar medicamentos da UBS',
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(
+                        behavior: SnackBarBehavior.floating,
+                        duration: Duration(seconds: 2),
+                        content: Text('Buscando atualizações na UBS...'),
+                      ),
+                    );
+                    await context.read<AppState>().syncUbsData();
+                  },
+                  child: const Icon(Icons.sync),
+                ),
+                const SizedBox(height: 16),
+                FloatingActionButton.extended(
+                  heroTag: 'btnAddMed',
+                  onPressed: () async {
                 final result = await Navigator.of(context).push<String>(
                   MaterialPageRoute(builder: (_) => const AddMedicationPage()),
                 );
@@ -219,9 +238,12 @@ class _HomePageState extends State<HomePage> {
               },
               icon: const Icon(Icons.add),
               label: const Text('Adicionar medicamento'),
-            )
+            ),
+          ],
+        )
           : _index == 2
               ? FloatingActionButton.extended(
+                  heroTag: 'btnAddAppointment',
                   onPressed: () async {
                     final result = await Navigator.of(context).push<String>(
                       MaterialPageRoute(builder: (_) => const AddAppointmentPage()),
