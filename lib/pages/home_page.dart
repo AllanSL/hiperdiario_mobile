@@ -98,7 +98,7 @@ class _HomePageState extends State<HomePage> {
                     const SnackBar(
                       behavior: SnackBarBehavior.floating,
                       duration: Duration(seconds: 2),
-                      content: Text('Buscando atualizações na UBS...'),
+                      content: Text('Buscando atualizações na UBS'),
                     ),
                   );
                   await context.read<AppState>().syncUbsData();

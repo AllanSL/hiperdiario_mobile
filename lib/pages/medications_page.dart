@@ -13,7 +13,7 @@ class MedicationsPage extends StatelessWidget {
     final app = context.watch<AppState>();
     final meds = app.medications;
     final pendings = app.pendingDispensations;
-    
+
     if (meds.isEmpty && pendings.isEmpty) {
       final colorScheme = Theme.of(context).colorScheme;
       return Center(
@@ -49,9 +49,9 @@ class MedicationsPage extends StatelessWidget {
         ),
       );
     }
-    
+
     final rootContext = context; // contexto estável do Scaffold/aba
-    
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -61,35 +61,39 @@ class MedicationsPage extends StatelessWidget {
             child: Text(
               'Retiradas Pendentes (SUS)',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
-          ...pendings.map((p) => Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: _PendingDispensationTile(p, rootContext: rootContext),
-          )),
+          ...pendings.map(
+            (p) => Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: _PendingDispensationTile(p, rootContext: rootContext),
+            ),
+          ),
           const SizedBox(height: 16),
           if (meds.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8.0, left: 4),
               child: Text(
                 'Meus Medicamentos',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
         ],
-        ...meds.map((m) => Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
-          child: _MedicationTile(
-            m,
-            app.lowStockDaysThreshold,
-            rootContext: rootContext,
+        ...meds.map(
+          (m) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: _MedicationTile(
+              m,
+              app.lowStockDaysThreshold,
+              rootContext: rootContext,
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -153,7 +157,10 @@ class _MedicationTile extends StatelessWidget {
                         Tooltip(
                           message: 'Medicamento retirado no SUS',
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: colorScheme.primaryContainer,
                               borderRadius: BorderRadius.circular(4),
@@ -168,7 +175,7 @@ class _MedicationTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ]
+                      ],
                     ],
                   ),
                 ),
@@ -220,7 +227,7 @@ class _MedicationTile extends StatelessWidget {
                           ),
                         );
                       }
-                    } else if (value == 'delete') {
+                    } else if (value == 'delete' && m.dispensationId == null) {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
@@ -300,23 +307,24 @@ class _MedicationTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete,
-                            size: 20,
-                            color: colorScheme.error,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Excluir',
-                            style: TextStyle(color: colorScheme.error),
-                          ),
-                        ],
+                    if (m.dispensationId == null)
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete,
+                              size: 20,
+                              color: colorScheme.error,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Excluir',
+                              style: TextStyle(color: colorScheme.error),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -407,15 +415,13 @@ class _PendingDispensationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Card(
       elevation: 0,
       color: colorScheme.primaryContainer.withValues(alpha: 0.5),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: colorScheme.primary.withValues(alpha: 0.3),
-        ),
+        side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -424,7 +430,11 @@ class _PendingDispensationTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.local_pharmacy, color: colorScheme.primary, size: 24),
+                Icon(
+                  Icons.local_pharmacy,
+                  color: colorScheme.primary,
+                  size: 24,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -451,7 +461,7 @@ class _PendingDispensationTile extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
                 icon: const Icon(Icons.alarm_add, size: 18),
-                label: const Text('Configurar Alarmes'),
+                label: const Text('Configurar lembretes'),
                 onPressed: () => _showAcknowledgeDialog(context),
                 style: FilledButton.styleFrom(
                   backgroundColor: colorScheme.primary,
@@ -471,23 +481,118 @@ class _AcknowledgeDispensationSheet extends StatefulWidget {
   const _AcknowledgeDispensationSheet({required this.dispensation});
 
   @override
-  State<_AcknowledgeDispensationSheet> createState() => _AcknowledgeDispensationSheetState();
+  State<_AcknowledgeDispensationSheet> createState() =>
+      _AcknowledgeDispensationSheetState();
 }
 
-class _AcknowledgeDispensationSheetState extends State<_AcknowledgeDispensationSheet> {
+class _AcknowledgeDispensationSheetState
+    extends State<_AcknowledgeDispensationSheet> {
   bool _isSaving = false;
+  final List<TimeOfDayLite> _times = [];
+
+  List<TimeOfDayLite> _generateFromBase(TimeOfDayLite base, int n) {
+    final interval = 24 * 60 / n;
+    final baseMinutes = base.hour * 60 + base.minute;
+    final res = <TimeOfDayLite>[];
+    for (var i = 0; i < n; i++) {
+      final minutes = (baseMinutes + (interval * i)).round() % (24 * 60);
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      res.add(TimeOfDayLite(h, m));
+    }
+    return res;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final d = widget.dispensation;
+    final n = d.frequencyPerDay <= 0 ? 1 : d.frequencyPerDay;
+
+    if (d.scheduledTimes.isNotEmpty) {
+      final parsed = <TimeOfDayLite>[];
+      for (final timeStr in d.scheduledTimes) {
+        final parts = timeStr.split(':');
+        if (parts.length >= 2) {
+          final h = int.tryParse(parts[0]) ?? 0;
+          final m = int.tryParse(parts[1]) ?? 0;
+          parsed.add(TimeOfDayLite(h, m));
+        }
+      }
+      if (parsed.isNotEmpty) {
+        if (parsed.length == n) {
+          parsed.sort(
+            (a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute,
+          );
+          _times.addAll(parsed);
+        } else {
+          // Use first provided as base and generate remaining automatically
+          final base = parsed.first;
+          _times.addAll(_generateFromBase(base, n));
+        }
+      }
+    }
+  }
+
+  Future<void> _pickTime([int? editIndex]) async {
+    final initial = editIndex != null && _times.length > editIndex
+        ? TimeOfDay(
+            hour: _times[editIndex].hour,
+            minute: _times[editIndex].minute,
+          )
+        : const TimeOfDay(hour: 8, minute: 0);
+
+    final t = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      initialEntryMode: TimePickerEntryMode.input,
+    );
+    if (t == null) return;
+
+    final lite = TimeOfDayLite(t.hour, t.minute);
+    final d = widget.dispensation;
+    final n = d.frequencyPerDay <= 0 ? 1 : d.frequencyPerDay;
+
+    if (_times.isEmpty) {
+      // First time defined by user -> generate full schedule
+      setState(() {
+        _times.clear();
+        _times.addAll(_generateFromBase(lite, n));
+      });
+      return;
+    }
+
+    // Editing an existing time (no deletion allowed). If editing index 0, regenerate others.
+    if (editIndex == 0) {
+      setState(() {
+        _times.clear();
+        _times.addAll(_generateFromBase(lite, n));
+      });
+      return;
+    }
+
+    if (editIndex != null && editIndex >= 0 && editIndex < _times.length) {
+      setState(() {
+        _times[editIndex] = lite;
+        _times.sort(
+          (a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute,
+        );
+      });
+    }
+  }
+
+  String _fmt(TimeOfDayLite t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   void _save() async {
     final d = widget.dispensation;
-    
-    final times = <TimeOfDayLite>[];
-    for (final timeStr in d.scheduledTimes) {
-      final parts = timeStr.split(':');
-      if (parts.length >= 2) {
-        final h = int.tryParse(parts[0]) ?? 0;
-        final m = int.tryParse(parts[1]) ?? 0;
-        times.add(TimeOfDayLite(h, m));
-      }
+    if (_times.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Defina o primeiro horário para ativar os alarmes'),
+        ),
+      );
+      return;
     }
 
     setState(() => _isSaving = true);
@@ -498,23 +603,47 @@ class _AcknowledgeDispensationSheetState extends State<_AcknowledgeDispensationS
     try {
       await context.read<AppState>().acknowledgeDispensation(
         widget.dispensation,
-        times,
+        List.of(_times),
         finalDosage,
       );
       if (mounted) {
         Navigator.of(context).pop();
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Medicamento da UBS sincronizado e alarmes ativados!'),
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            backgroundColor: theme.colorScheme.primaryContainer,
+            duration: const Duration(seconds: 2),
+            content: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Medicamento da UBS sincronizado e alarmes ativados!',
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
       }
     }
   }
@@ -524,7 +653,6 @@ class _AcknowledgeDispensationSheetState extends State<_AcknowledgeDispensationS
     final d = widget.dispensation;
 
     final freqStr = d.frequencyLabel ?? '${d.frequencyPerDay}x ao dia';
-    final horariosStr = d.scheduledTimes.join(' - ');
 
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -533,33 +661,70 @@ class _AcknowledgeDispensationSheetState extends State<_AcknowledgeDispensationS
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Configurar medicamento do SUS',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            'Pendência (SUS)',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text('${d.activePrinciple} - ${d.dispensedQuantity} un. recebidas.'),
-          const SizedBox(height: 24),
-          Text(
-            'Frequência indicada: $freqStr',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          if (horariosStr.isNotEmpty) ...[
-            const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          // const SizedBox(height: 2),
+          if (_times.isNotEmpty) ...[
             Text(
-              'Horários pré-definidos: $horariosStr',
-              style: const TextStyle(fontSize: 14),
+              'Frequência indicada: $freqStr',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            // const SizedBox(height: 2),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _times
+                  .asMap()
+                  .entries
+                  .map(
+                    (e) => ActionChip(
+                      label: Text(_fmt(e.value)),
+                      onPressed: () => _pickTime(e.key),
+                    ),
+                  )
+                  .toList(),
             ),
           ],
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: (_isSaving || d.scheduledTimes.isEmpty) ? null : _save,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+          if (_times.isEmpty) ...[
+            FilledButton.icon(
+              icon: const Icon(Icons.access_time),
+              label: const Text('Definir lembretes'),
+              onPressed: () => _pickTime(),
             ),
-            child: _isSaving
-                ? const CircularProgressIndicator(color: Colors.white)
-                : Text(d.scheduledTimes.isEmpty ? 'Nenhum horário definido na UBS' : 'Aceitar e Configurar Alarmes'),
-          ),
+            const SizedBox(height: 16),
+          ] else ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _times.clear();
+                  });
+                },
+                icon: const Icon(Icons.clear),
+                label: const Text('Limpar horários'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _isSaving ? null : _save,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              child: _isSaving
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Salvar'),
+            ),
+          ],
         ],
       ),
     );

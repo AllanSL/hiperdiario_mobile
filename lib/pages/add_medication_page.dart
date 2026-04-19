@@ -59,6 +59,19 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   bool _isSaving = false; // proteção contra cliques múltiplos
   bool _isLoadingMeds = true;
 
+  List<TimeOfDayLite> _generateFromBase(TimeOfDayLite base, int n) {
+    final interval = 24 * 60 / n;
+    final baseMinutes = base.hour * 60 + base.minute;
+    final res = <TimeOfDayLite>[];
+    for (var i = 0; i < n; i++) {
+      final minutes = (baseMinutes + (interval * i)).round() % (24 * 60);
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      res.add(TimeOfDayLite(h, m));
+    }
+    return res;
+  }
+
   Map<String, List<String>> _catalogMap =
       {}; // Cache do catálogo: ativo -> [doses formatadas]
 
@@ -350,7 +363,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Medicamento do SUS. O nome e a posologia não podem ser alterados.',
+                            'Apenas o horário pode ser editado.',
                             style: TextStyle(
                               color: Theme.of(
                                 context,
@@ -402,6 +415,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   validator: () => _selectedMedName == null && !isSusMed
                       ? 'Selecione um medicamento'
                       : null,
+                  enabled: !isSusMed,
                 ),
                 if (_isOtherMed && !isSusMed) ...[
                   const SizedBox(height: 12),
@@ -447,6 +461,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   validator: () => _selectedDose == null && !isSusMed
                       ? 'Selecione a dose'
                       : null,
+                  enabled: !isSusMed,
                 ),
                 const SizedBox(height: 12),
                 _SelectorField(
@@ -457,30 +472,43 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   valueText: _selectedPerDay != null
                       ? _freqLabel(_selectedPerDay!)
                       : '',
-                  onTap: () async {
-                    FocusScope.of(context).unfocus();
-                    final options = _perDayOptions.map(_freqLabel).toList();
-                    final choice = await _openBottomSheet(
-                      context,
-                      'Selecione a frequência',
-                      options,
-                    );
-                    await Future.delayed(const Duration(milliseconds: 100));
-                    if (!mounted) return;
-                    FocusScope.of(context).unfocus();
-                    if (choice == null) return;
-                    final idx = options.indexOf(choice);
-                    setState(() {
-                      _freqErrorText = null;
-                      _selectedPerDay = _perDayOptions[idx];
-                      if (_selectedPerDay != null &&
-                          _times.length > _selectedPerDay!) {
-                        _times.removeRange(_selectedPerDay!, _times.length);
-                      }
-                    });
-                  },
-                  validator: () =>
-                      _selectedPerDay == null ? 'Selecione a frequência' : null,
+                  onTap: isSusMed
+                      ? null
+                      : () async {
+                          FocusScope.of(context).unfocus();
+                          final options = _perDayOptions
+                              .map(_freqLabel)
+                              .toList();
+                          final choice = await _openBottomSheet(
+                            context,
+                            'Selecione a frequência',
+                            options,
+                          );
+                          await Future.delayed(
+                            const Duration(milliseconds: 100),
+                          );
+                          if (!mounted) return;
+                          FocusScope.of(context).unfocus();
+                          if (choice == null) return;
+                          final idx = options.indexOf(choice);
+                          setState(() {
+                            _freqErrorText = null;
+                            _selectedPerDay = _perDayOptions[idx];
+                            if (_selectedPerDay != null &&
+                                _times.length > _selectedPerDay!) {
+                              _times.removeRange(
+                                _selectedPerDay!,
+                                _times.length,
+                              );
+                            }
+                          });
+                        },
+                  validator: isSusMed
+                      ? () => null
+                      : () => _selectedPerDay == null
+                            ? 'Selecione a frequência'
+                            : null,
+                  enabled: !isSusMed,
                 ),
                 const SizedBox(height: 12),
                 _SelectorField(
@@ -524,12 +552,15 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _stockCtrl,
+                  enabled: !isSusMed,
                   decoration: AppInputDecoration.build(
                     context,
                     labelText: 'Estoque inicial (unidades)',
                     prefixIcon: Icon(
                       Icons.inventory,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: !isSusMed
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   keyboardType: TextInputType.number,
@@ -591,8 +622,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   Future<void> _pickTime() async {
     FocusScope.of(context).unfocus(); // Retira o foco de qualquer campo ativo
     final isSusMed = widget.initial?.dispensationId != null;
+    final isEditing = widget.initial != null;
 
-    if (!isSusMed) {
+    if (!isSusMed && !isEditing) {
       if (_selectedPerDay == null) {
         setState(() => _freqErrorText = 'Defina a frequência primeiro');
         _freqFocusNode.requestFocus();
@@ -659,18 +691,30 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       return;
     }
 
+    final n =
+        _selectedPerDay ??
+        (isEditing ? (_times.isNotEmpty ? _times.length : 1) : 1);
+
+    if (isEditing) {
+      // Ao editar, redefinimos a grade de horários a partir do horário base escolhido
+      setState(() {
+        _times.clear();
+        _times.addAll(_generateFromBase(lite, n));
+      });
+      return;
+    }
+
+    // Criação normal: adiciona e, se for o primeiro horário e frequência conhecida, gera os demais
     setState(() {
       _times.add(lite);
 
-      // Auto preenchimento dos demais horários baseados no primeiro escolhido
       if (!isSusMed &&
           _selectedPerDay != null &&
           _selectedPerDay! > 1 &&
           _times.length == 1) {
-        final interval = 24 ~/ _selectedPerDay!;
-        for (int i = 1; i < _selectedPerDay!; i++) {
-          final nextHour = (lite.hour + (interval * i)) % 24;
-          final nextLite = TimeOfDayLite(nextHour, lite.minute);
+        final generated = _generateFromBase(lite, _selectedPerDay!);
+        for (var i = 1; i < generated.length; i++) {
+          final nextLite = generated[i];
           if (!_times.any(
             (time) =>
                 time.hour == nextLite.hour && time.minute == nextLite.minute,
@@ -829,6 +873,7 @@ class _SelectorField extends StatelessWidget {
   final Future<void> Function()? onTap;
   final FocusNode? focusNode;
   final String? errorText;
+  final bool enabled;
 
   const _SelectorField({
     required this.label,
@@ -838,6 +883,7 @@ class _SelectorField extends StatelessWidget {
     required this.validator,
     this.focusNode,
     this.errorText,
+    this.enabled = true,
   });
 
   @override
@@ -849,10 +895,19 @@ class _SelectorField extends StatelessWidget {
         child: TextFormField(
           focusNode: focusNode,
           readOnly: true,
+          enabled: enabled,
+          style: enabled
+              ? null
+              : TextStyle(color: colorScheme.onSurfaceVariant),
           decoration: AppInputDecoration.build(
             context,
             labelText: label,
-            prefixIcon: Icon(icon, color: colorScheme.primary),
+            prefixIcon: Icon(
+              icon,
+              color: enabled
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
           ).copyWith(errorText: errorText),
           controller: TextEditingController(text: valueText),
           validator: (_) => validator?.call(),
@@ -861,4 +916,3 @@ class _SelectorField extends StatelessWidget {
     );
   }
 }
-

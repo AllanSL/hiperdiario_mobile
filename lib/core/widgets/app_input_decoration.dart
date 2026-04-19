@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppInputDecoration {
-  
   static InputDecoration build(
     BuildContext context, {
     String? labelText,
