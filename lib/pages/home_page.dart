@@ -13,7 +13,8 @@ import 'settings_page.dart';
 import 'health_tips_page.dart';
 
 // Classes exportadas de profile_page.dart
-export 'profile_page.dart' show EditPersonalContactsPage, EditEmergencyContactPage, QrProfilePage;
+export 'profile_page.dart'
+    show EditPersonalContactsPage, EditEmergencyContactPage, QrProfilePage;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -40,7 +41,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-  final pages = const [ProfilePage(), MedicationsPage(), AppointmentsPage()];
+    final pages = const [ProfilePage(), MedicationsPage(), AppointmentsPage()];
     const appTitle = 'HiperDiário';
     return Scaffold(
       appBar: AppBar(
@@ -70,7 +71,9 @@ class _HomePageState extends State<HomePage> {
             builder: (context, themeProvider, _) {
               final isDark = themeProvider.isDark(context);
               return IconButton(
-                tooltip: isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro',
+                tooltip: isDark
+                    ? 'Mudar para tema claro'
+                    : 'Mudar para tema escuro',
                 icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
                 onPressed: () => themeProvider.toggle(context),
               );
@@ -83,6 +86,24 @@ class _HomePageState extends State<HomePage> {
                 tooltip: 'Configurar alerta de estoque',
                 onPressed: () => _configureLowStock(context),
                 icon: const Icon(Icons.notifications_active),
+              ),
+            ),
+          if (_index == 1)
+            Tooltip(
+              message: 'Atualizar medicamentos da UBS',
+              child: IconButton(
+                tooltip: 'Atualizar medicamentos da UBS',
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 2),
+                      content: Text('Buscando atualizações na UBS...'),
+                    ),
+                  );
+                  await context.read<AppState>().syncUbsData();
+                },
+                icon: const Icon(Icons.sync),
               ),
             ),
         ],
@@ -125,7 +146,9 @@ class _HomePageState extends State<HomePage> {
                 onTap: () {
                   Navigator.of(context).pop();
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AppointmentHistoryPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const AppointmentHistoryPage(),
+                    ),
                   );
                 },
               ),
@@ -151,19 +174,26 @@ class _HomePageState extends State<HomePage> {
                       SnackBar(
                         behavior: SnackBarBehavior.floating,
                         margin: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         backgroundColor: Theme.of(context).colorScheme.error,
                         duration: const Duration(seconds: 2),
                         content: Row(
                           children: [
-                            Icon(Icons.logout, color: Theme.of(context).colorScheme.onError),
+                            Icon(
+                              Icons.logout,
+                              color: Theme.of(context).colorScheme.onError,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'Sessão encerrada',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onError),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onError,
+                                ),
                               ),
                             ),
                           ],
@@ -182,71 +212,23 @@ class _HomePageState extends State<HomePage> {
         onPageChanged: (i) => setState(() => _index = i),
         children: pages,
       ),
-      floatingActionButton: _index == 1
-          ? Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.end,
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Offstage(
+            offstage: _index != 1,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                FloatingActionButton.small(
-                  heroTag: 'btnSyncMed',
-                  tooltip: 'Atualizar medicamentos da UBS',
-                  onPressed: () async {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                       const SnackBar(
-                        behavior: SnackBarBehavior.floating,
-                        duration: Duration(seconds: 2),
-                        content: Text('Buscando atualizações na UBS...'),
-                      ),
-                    );
-                    await context.read<AppState>().syncUbsData();
-                  },
-                  child: const Icon(Icons.sync),
-                ),
-                const SizedBox(height: 16),
                 FloatingActionButton.extended(
                   heroTag: 'btnAddMed',
                   onPressed: () async {
-                final result = await Navigator.of(context).push<String>(
-                  MaterialPageRoute(builder: (_) => const AddMedicationPage()),
-                );
-                if (!mounted) return;
-                if (result == 'added') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                      duration: const Duration(seconds: 2),
-                      content: Row(
-                        children: [
-                          Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.onPrimaryContainer),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Medicamento adicionado com sucesso',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Adicionar medicamento'),
-            ),
-          ],
-        )
-          : _index == 2
-              ? FloatingActionButton.extended(
-                  heroTag: 'btnAddAppointment',
-                  onPressed: () async {
                     final result = await Navigator.of(context).push<String>(
-                      MaterialPageRoute(builder: (_) => const AddAppointmentPage()),
+                      MaterialPageRoute(
+                        builder: (_) => const AddMedicationPage(),
+                      ),
                     );
                     if (!mounted) return;
                     if (result == 'added') {
@@ -254,19 +236,32 @@ class _HomePageState extends State<HomePage> {
                         SnackBar(
                           behavior: SnackBarBehavior.floating,
                           margin: const EdgeInsets.all(16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
                           duration: const Duration(seconds: 2),
                           content: Row(
                             children: [
-                              Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                              Icon(
+                                Icons.check_circle_outline,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Consulta agendada com sucesso',
+                                  'Medicamento adicionado com sucesso',
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimaryContainer,
+                                  ),
                                 ),
                               ),
                             ],
@@ -276,9 +271,65 @@ class _HomePageState extends State<HomePage> {
                     }
                   },
                   icon: const Icon(Icons.add),
-                  label: const Text('Nova consulta'),
-                )
-              : null,
+                  label: const Text('Adicionar medicamento'),
+                ),
+              ],
+            ),
+          ),
+          Offstage(
+            offstage: _index != 2,
+            child: FloatingActionButton.extended(
+              heroTag: 'btnAddAppointment',
+              onPressed: () async {
+                final result = await Navigator.of(context).push<String>(
+                  MaterialPageRoute(builder: (_) => const AddAppointmentPage()),
+                );
+                if (!mounted) return;
+                if (result == 'added') {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.all(16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
+                      duration: const Duration(seconds: 2),
+                      content: Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Consulta agendada com sucesso',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Nova consulta'),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -293,24 +344,36 @@ class _HomePageState extends State<HomePage> {
         },
         destinations: [
           NavigationDestination(
-            icon: Icon(Icons.person_outline,
-                color: Theme.of(context).colorScheme.onSurfaceVariant),
-            selectedIcon: Icon(Icons.person,
-                color: Theme.of(context).colorScheme.onPrimary),
+            icon: Icon(
+              Icons.person_outline,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            selectedIcon: Icon(
+              Icons.person,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
             label: 'Perfil',
           ),
           NavigationDestination(
-            icon: Icon(Icons.medication_outlined,
-                color: Theme.of(context).colorScheme.onSurfaceVariant),
-            selectedIcon: Icon(Icons.medication,
-                color: Theme.of(context).colorScheme.onPrimary),
+            icon: Icon(
+              Icons.medication_outlined,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            selectedIcon: Icon(
+              Icons.medication,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
             label: 'Medicamentos',
           ),
           NavigationDestination(
-            icon: Icon(Icons.event_outlined,
-                color: Theme.of(context).colorScheme.onSurfaceVariant),
-            selectedIcon: Icon(Icons.event,
-                color: Theme.of(context).colorScheme.onPrimary),
+            icon: Icon(
+              Icons.event_outlined,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            selectedIcon: Icon(
+              Icons.event,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
             label: 'Consultas',
           ),
         ],
@@ -362,10 +425,14 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             Text(
                               '$temp',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              style:
+                                  Theme.of(
+                                    context,
+                                  ).textTheme.headlineMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.primary,
-                                  ) ?? TextStyle(
+                                  ) ??
+                                  TextStyle(
                                     fontSize: 40,
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.primary,
@@ -373,9 +440,13 @@ class _HomePageState extends State<HomePage> {
                             ),
                             Text(
                               temp == 1 ? 'dia' : 'dias',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style:
+                                  Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
-                                  ) ?? TextStyle(
+                                  ) ??
+                                  TextStyle(
                                     fontSize: 14,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
