@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -26,17 +27,102 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _index = 0;
   late final PageController _pageController;
+  double _currentPage = 0.0;
+  Timer? _medFabTimer;
+  Timer? _appointmentFabTimer;
+  bool _canShowMedFab = false;
+  bool _canShowAppointmentFab = false;
+  static const Duration _fabDebounce = Duration(milliseconds: 150);
+  // Bloqueio de navegação para evitar spam de cliques nas guias
+  bool _isNavigating = false;
+  Timer? _navigationReleaseTimer;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _index, keepPage: true);
+    _currentPage = _index.toDouble();
+    _pageController.addListener(_onPageControllerScroll);
+    _canShowMedFab = _index == 1;
+    _canShowAppointmentFab = _index == 2;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFabVisibility());
   }
 
   @override
   void dispose() {
+    _medFabTimer?.cancel();
+    _appointmentFabTimer?.cancel();
+    _navigationReleaseTimer?.cancel();
+    _pageController.removeListener(_onPageControllerScroll);
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _onPageControllerScroll() {
+    if (!_pageController.hasClients) return;
+    final page = _pageController.page ?? _currentPage;
+    // Evita rebuilds excessivos: atualiza apenas quando houver diferença significativa
+    if ((page - _currentPage).abs() > 0.0001) {
+      setState(() => _currentPage = page);
+      _updateFabVisibility();
+    }
+
+    // Se estivermos navegando por clique, libera o bloqueio quando a página
+    // estiver suficientemente visível/estável (usa debounce para estabilidade)
+    if (_isNavigating) {
+      if (_isPageFullyVisible(_index)) {
+        _navigationReleaseTimer ??= Timer(_fabDebounce, () {
+            _navigationReleaseTimer = null;
+            if (_isPageFullyVisible(_index) && mounted) {
+              setState(() => _isNavigating = false);
+            }
+          });
+      } else {
+        _navigationReleaseTimer?.cancel();
+        _navigationReleaseTimer = null;
+      }
+    }
+  }
+
+  bool _isPageFullyVisible(int pageIndex) {
+    if (!_pageController.hasClients) return _index == pageIndex;
+    // Considera a página visível apenas quando a posição estiver muito próxima
+    // do índice inteiro (ajuste o threshold se necessário)
+    return (_currentPage - pageIndex).abs() < 0.4;
+  }
+
+  void _updateFabVisibility() {
+    // Medication FAB debounce
+    if (_isPageFullyVisible(1)) {
+      if (!_canShowMedFab && _medFabTimer == null) {
+        _medFabTimer = Timer(_fabDebounce, () {
+          _medFabTimer = null;
+          if (_isPageFullyVisible(1)) {
+            setState(() => _canShowMedFab = true);
+          }
+        });
+      }
+    } else {
+      _medFabTimer?.cancel();
+      _medFabTimer = null;
+      if (_canShowMedFab) setState(() => _canShowMedFab = false);
+    }
+
+    // Appointment FAB debounce
+    if (_isPageFullyVisible(2)) {
+      if (!_canShowAppointmentFab && _appointmentFabTimer == null) {
+        _appointmentFabTimer = Timer(_fabDebounce, () {
+          _appointmentFabTimer = null;
+          if (_isPageFullyVisible(2)) {
+            setState(() => _canShowAppointmentFab = true);
+          }
+        });
+      }
+    } else {
+      _appointmentFabTimer?.cancel();
+      _appointmentFabTimer = null;
+      if (_canShowAppointmentFab) setState(() => _canShowAppointmentFab = false);
+    }
   }
 
   @override
@@ -79,7 +165,7 @@ class _HomePageState extends State<HomePage> {
               );
             },
           ),
-          if (_index == 1)
+          if (_canShowMedFab)
             Tooltip(
               message: 'Ajustar dias para aviso de estoque baixo',
               child: IconButton(
@@ -88,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                 icon: const Icon(Icons.notifications_active),
               ),
             ),
-          if (_index == 1)
+          if (_canShowMedFab)
             Tooltip(
               message: 'Atualizar medicamentos da UBS',
               child: IconButton(
@@ -209,7 +295,26 @@ class _HomePageState extends State<HomePage> {
       ),
       body: PageView(
         controller: _pageController,
-        onPageChanged: (i) => setState(() => _index = i),
+        onPageChanged: (i) {
+          setState(() {
+            _index = i;
+            _currentPage = i.toDouble();
+            // Página confirmada: cancelar timers e atualizar flags imediatamente
+            _medFabTimer?.cancel();
+            _medFabTimer = null;
+            _appointmentFabTimer?.cancel();
+            _appointmentFabTimer = null;
+            _canShowMedFab = (i == 1);
+            _canShowAppointmentFab = (i == 2);
+          });
+          // Libera o bloqueio de navegação após um pequeno debounce para
+          // garantir que a página destino esteja estável/visível
+          _navigationReleaseTimer?.cancel();
+          _navigationReleaseTimer = Timer(_fabDebounce, () {
+            _navigationReleaseTimer = null;
+            if (mounted) setState(() => _isNavigating = false);
+          });
+        },
         children: pages,
       ),
       floatingActionButton: Column(
@@ -218,7 +323,7 @@ class _HomePageState extends State<HomePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Offstage(
-            offstage: _index != 1,
+            offstage: !_canShowMedFab,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -277,7 +382,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           Offstage(
-            offstage: _index != 2,
+            offstage: !_canShowAppointmentFab,
             child: FloatingActionButton.extended(
               heroTag: 'btnAddAppointment',
               onPressed: () async {
@@ -330,19 +435,27 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-        indicatorColor: Theme.of(context).colorScheme.primary,
-        onDestinationSelected: (i) {
-          setState(() => _index = i);
-          _pageController.animateToPage(
-            i,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-          );
-        },
-        destinations: [
+      bottomNavigationBar: AbsorbPointer(
+        absorbing: _isNavigating,
+        child: NavigationBar(
+          selectedIndex: _index,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          indicatorColor: Theme.of(context).colorScheme.primary,
+          onDestinationSelected: (i) {
+            if (_isNavigating) return;
+            // Ignora cliques no mesmo destino para não travar o bloqueio de navegação
+            if (i == _index) return;
+            setState(() {
+              _index = i;
+              _isNavigating = true;
+            });
+            _pageController.animateToPage(
+              i,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+            );
+          },
+          destinations: [
           NavigationDestination(
             icon: Icon(
               Icons.person_outline,
@@ -377,6 +490,7 @@ class _HomePageState extends State<HomePage> {
             label: 'Consultas',
           ),
         ],
+      ),
       ),
     );
   }
