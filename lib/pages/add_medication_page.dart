@@ -515,12 +515,23 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   label: 'Adicionar horário',
                   icon: Icons.access_time,
                   valueText: '',
-                  onTap: _pickTime,
+                  onTap: !isSusMed &&
+                          _selectedPerDay != null &&
+                          _times.length >= _selectedPerDay!
+                      ? null
+                      : isSusMed &&
+                              widget.initial != null &&
+                              _times.length >= widget.initial!.times.length
+                          ? null
+                          : _pickTime,
                   validator: () {
                     if (isSusMed) {
-                      return _times.isEmpty
-                          ? 'Adicione pelo menos um horário'
-                          : null;
+                      final expected = widget.initial?.times.length;
+                      if (_times.isEmpty) return 'Adicione pelo menos um horário';
+                      if (expected != null && _times.length != expected) {
+                        return 'Adicione exatamente $expected horário(s)';
+                      }
+                      return null;
                     }
                     if (_selectedPerDay != null &&
                         _times.length != _selectedPerDay!) {
@@ -540,8 +551,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                           .asMap()
                           .entries
                           .map(
-                            (e) => Chip(
+                            (e) => InputChip(
                               label: Text(_fmt(e.value)),
+                              onPressed: () => _pickTime(e.key),
                               onDeleted: () =>
                                   setState(() => _times.removeAt(e.key)),
                             ),
@@ -619,12 +631,11 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     );
   }
 
-  Future<void> _pickTime() async {
+  Future<void> _pickTime([int? editIndex]) async {
     FocusScope.of(context).unfocus(); // Retira o foco de qualquer campo ativo
     final isSusMed = widget.initial?.dispensationId != null;
-    final isEditing = widget.initial != null;
 
-    if (!isSusMed && !isEditing) {
+    if (!isSusMed && editIndex == null) {
       if (_selectedPerDay == null) {
         setState(() => _freqErrorText = 'Defina a frequência primeiro');
         _freqFocusNode.requestFocus();
@@ -639,6 +650,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         _freqFocusNode.requestFocus();
         return;
       }
+    }
+
+    if (isSusMed && editIndex == null &&
+        widget.initial != null &&
+        _times.length >= widget.initial!.times.length) {
+      _showCustomSnackBar('Já existem todos os horários da UBS');
+      return;
     }
 
     final t = await showTimePicker(
@@ -687,43 +705,42 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     );
 
     if (alreadyExists) {
-      _showCustomSnackBar('Este horário já foi adicionado');
-      return;
+      final isSameIndex = editIndex != null &&
+          _times[editIndex].hour == lite.hour &&
+          _times[editIndex].minute == lite.minute;
+      if (!isSameIndex) {
+        _showCustomSnackBar('Este horário já foi adicionado');
+        return;
+      }
     }
 
-    final n =
-        _selectedPerDay ??
-        (isEditing ? (_times.isNotEmpty ? _times.length : 1) : 1);
-
-    if (isEditing) {
-      // Ao editar, redefinimos a grade de horários a partir do horário base escolhido
+    if (editIndex != null) {
       setState(() {
-        _times.clear();
-        _times.addAll(_generateFromBase(lite, n));
+        _times[editIndex] = lite;
+        _times.sort(
+          (a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute,
+        );
       });
       return;
     }
 
-    // Criação normal: adiciona e, se for o primeiro horário e frequência conhecida, gera os demais
+    final targetCount = !isSusMed
+        ? (_selectedPerDay ?? 1)
+        : (widget.initial?.times.length ?? 1);
+
+    if (_times.isEmpty && targetCount > 1) {
+      setState(() {
+        _times.clear();
+        _times.addAll(_generateFromBase(lite, targetCount));
+        _times.sort(
+          (a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute,
+        );
+      });
+      return;
+    }
+
     setState(() {
       _times.add(lite);
-
-      if (!isSusMed &&
-          _selectedPerDay != null &&
-          _selectedPerDay! > 1 &&
-          _times.length == 1) {
-        final generated = _generateFromBase(lite, _selectedPerDay!);
-        for (var i = 1; i < generated.length; i++) {
-          final nextLite = generated[i];
-          if (!_times.any(
-            (time) =>
-                time.hour == nextLite.hour && time.minute == nextLite.minute,
-          )) {
-            _times.add(nextLite);
-          }
-        }
-      }
-
       _times.sort(
         (a, b) => a.hour != b.hour ? a.hour - b.hour : a.minute - b.minute,
       );
@@ -750,6 +767,11 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       }
     } else if (_times.isEmpty) {
       _showCustomSnackBar('Adicione pelo menos um horário');
+      return;
+    } else if (isSusMed && widget.initial != null &&
+        _times.length != widget.initial!.times.length) {
+      _showCustomSnackBar(
+          'Adicione exatamente ${widget.initial!.times.length} horário(s)');
       return;
     }
 
