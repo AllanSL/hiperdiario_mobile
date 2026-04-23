@@ -34,6 +34,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   bool _dropdownAberto = false;
   bool _locationModoDigitacao =
       false; // false = readOnly (sem teclado), true = editável
+  bool _locationFixa = false; // local vindo do cadastro do paciente
 
   final _locationFocusNode = FocusNode();
   final _locationFieldKey = GlobalKey<FormFieldState>();
@@ -135,6 +136,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
               _locationController.removeListener(_onLocationChanged);
               _locationController.text = est.nomeFantasia;
               _locationController.addListener(_onLocationChanged);
+              _locationFixa = true;
             }
             break;
           }
@@ -781,8 +783,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                     key: _locationFieldKey,
                     controller: _locationController,
                     focusNode: _locationFocusNode,
-                    readOnly: !_locationModoDigitacao,
-                    onTap: _onLocationTap,
+                    enabled: !_locationFixa,
+                    readOnly: true,
+                    onTap: _locationFixa ? null : _onLocationTap,
                     textCapitalization: TextCapitalization.words,
                     decoration: AppInputDecoration.build(
                       context,
@@ -790,7 +793,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                       hintText: 'Toque para ver as UBS ou digite para filtrar',
                       prefixIcon: Icon(
                         Icons.location_on,
-                        color: colorScheme.primary,
+                        color: _locationFixa
+                            ? colorScheme.onSurfaceVariant.withOpacity(0.38)
+                            : colorScheme.primary,
                       ),
                       suffixIcon: _cnesCarregando
                           ? Padding(
@@ -804,32 +809,37 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                 ),
                               ),
                             )
-                          : _locationController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _estabelecimenteSelecionado = null;
-                                _locationController.clear();
-                                setState(() => _locationModoDigitacao = true);
-                                _locationFocusNode.requestFocus();
-                                _abrirDropdown();
-                              },
-                            )
-                          : IconButton(
-                              icon: Icon(
-                                _dropdownAberto
-                                    ? Icons.arrow_drop_up
-                                    : Icons.arrow_drop_down,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              onPressed: () {
-                                if (_dropdownAberto) {
-                                  _fecharDropdown();
-                                } else {
-                                  _onLocationTap();
-                                }
-                              },
-                            ),
+                          : _locationFixa
+                              ? null
+                              : _locationController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        _estabelecimenteSelecionado = null;
+                                        _locationController.clear();
+                                        setState(() {
+                                          _locationModoDigitacao = true;
+                                          _locationFixa = false;
+                                        });
+                                        _locationFocusNode.requestFocus();
+                                        _abrirDropdown();
+                                      },
+                                    )
+                                  : IconButton(
+                                      icon: Icon(
+                                        _dropdownAberto
+                                            ? Icons.arrow_drop_up
+                                            : Icons.arrow_drop_down,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      onPressed: () {
+                                        if (_dropdownAberto) {
+                                          _fecharDropdown();
+                                        } else {
+                                          _onLocationTap();
+                                        }
+                                      },
+                                    ),
                     ),
                     validator: (v) => v == null || v.trim().isEmpty
                         ? 'Informe o local'
