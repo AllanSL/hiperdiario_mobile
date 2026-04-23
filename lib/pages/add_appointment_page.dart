@@ -52,6 +52,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   final _dateFieldKey = GlobalKey<FormFieldState>();
   final _timeFieldKey = GlobalKey<FormFieldState>();
   final _specialtyOverlayController = OverlayPortalController();
+  ModalRoute<dynamic>? _modalRoute;
 
   @override
   void initState() {
@@ -78,6 +79,19 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _modalRoute) {
+      if (_modalRoute != null) {
+        _modalRoute!.removeScopedWillPopCallback(_onWillPop);
+      }
+      _modalRoute = route;
+      _modalRoute?.addScopedWillPopCallback(_onWillPop);
+    }
+  }
+
+  @override
   void dispose() {
     _locationController.removeListener(_onLocationChanged);
     _locationFocusNode.removeListener(_onFocusChanged);
@@ -89,6 +103,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     _specialtyController.dispose();
     _notesController.dispose();
     _locationFocusNode.dispose();
+    _modalRoute?.removeScopedWillPopCallback(_onWillPop);
     super.dispose();
   }
 
@@ -724,6 +739,15 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       appState.updateAppointment(appointment);
       Navigator.pop(context, 'updated');
     }
+  }
+
+  Future<bool> _onWillPop() async {
+    if (_dropdownAberto || _dropdownEspecAberto) {
+      if (_dropdownAberto) _fecharDropdown();
+      if (_dropdownEspecAberto) _fecharDropdownEspecialidade();
+      return true;
+    }
+    return true;
   }
 
   @override

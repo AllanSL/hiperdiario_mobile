@@ -625,6 +625,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _municipioOverlayController = OverlayPortalController();
   final _ubsOverlayController = OverlayPortalController();
   final _genderOverlayController = OverlayPortalController();
+  ModalRoute<dynamic>? _modalRoute;
   final _conditionFieldKey = GlobalKey();
   final _conditionOverlayController = OverlayPortalController();
   final _relationshipFieldKey = GlobalKey();
@@ -718,6 +719,19 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _modalRoute) {
+      if (_modalRoute != null) {
+        _modalRoute!.removeScopedWillPopCallback(_onWillPop);
+      }
+      _modalRoute = route;
+      _modalRoute?.addScopedWillPopCallback(_onWillPop);
+    }
+  }
+
+  @override
   void dispose() {
     _cpfController.dispose();
     _nameController.dispose();
@@ -748,6 +762,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _municipioController.dispose();
     _ubsFocusNode.dispose();
     _ubsController.dispose();
+    _modalRoute?.removeScopedWillPopCallback(_onWillPop);
     _cpfFocusNode.dispose();
     _passwordFocusNode.dispose();
     _confirmPasswordFocusNode.dispose();
@@ -2662,52 +2677,73 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _currentStep--);
   }
 
+  Future<bool> _onWillPop() async {
+    if (_estadoDropdownAberto ||
+        _municipioDropdownAberto ||
+        _ubsDropdownAberto ||
+        _genderDropdownAberto ||
+        _conditionDropdownAberto ||
+        _relationshipDropdownAberto) {
+      if (_estadoDropdownAberto) _fecharDropdownEstado();
+      if (_municipioDropdownAberto) _fecharDropdownMunicipio();
+      if (_ubsDropdownAberto) _fecharDropdownUbs();
+      if (_genderDropdownAberto) _fecharDropdownGenero();
+      if (_conditionDropdownAberto) _fecharDropdownCondicao();
+      if (_relationshipDropdownAberto) _fecharDropdownParentesco();
+      return true;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
       appBar: AppBar(title: const Text('Cadastro')),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-                vertical: 16.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        FocusScope.of(context).unfocus();
-                        _fecharDropdownEstado();
-                        _fecharDropdownMunicipio();
-                        _fecharDropdownGenero();
-                        _fecharDropdownCondicao();
-                        _fecharDropdownParentesco();
-                      },
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            _buildStepContent(colorScheme, textTheme),
-                            SizedBox(
-                              // Calcula a altura somando o tamanho aproximado de cada item (48px)
-                              height: _relationshipDropdownAberto
-                                  ? (_relationshipOptions.length * 44.0)
-                                  : 0.0,
-                            ),
-                          ],
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 16.0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          FocusScope.of(context).unfocus();
+                          _fecharDropdownEstado();
+                          _fecharDropdownMunicipio();
+                          _fecharDropdownGenero();
+                          _fecharDropdownCondicao();
+                          _fecharDropdownParentesco();
+                        },
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              _buildStepContent(colorScheme, textTheme),
+                              SizedBox(
+                                // Calcula a altura somando o tamanho aproximado de cada item (48px)
+                                height: _relationshipDropdownAberto
+                                    ? (_relationshipOptions.length * 44.0)
+                                    : 0.0,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

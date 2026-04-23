@@ -529,6 +529,7 @@ class _EditLocationPageState extends State<EditLocationPage> {
   bool _municipioDropdownAberto = false;
   bool _municipioModoDigitacao =
       false; // false = readOnly (sem teclado), true = editável
+  ModalRoute<dynamic>? _modalRoute;
 
   @override
   void initState() {
@@ -570,6 +571,19 @@ class _EditLocationPageState extends State<EditLocationPage> {
           showLoading: false,
         );
       }
+
+      @override
+      void didChangeDependencies() {
+        super.didChangeDependencies();
+        final route = ModalRoute.of(context);
+        if (route != _modalRoute) {
+          if (_modalRoute != null) {
+            _modalRoute!.removeScopedWillPopCallback(_onWillPop);
+          }
+          _modalRoute = route;
+          _modalRoute?.addScopedWillPopCallback(_onWillPop);
+        }
+      }
     }
   }
 
@@ -583,6 +597,7 @@ class _EditLocationPageState extends State<EditLocationPage> {
     _municipioFocusNode.removeListener(_onMunicipioFocusChanged);
     _municipioController.dispose();
     _municipioFocusNode.dispose();
+    _modalRoute?.removeScopedWillPopCallback(_onWillPop);
     super.dispose();
   }
 
@@ -867,6 +882,15 @@ class _EditLocationPageState extends State<EditLocationPage> {
         ),
       ),
     );
+  }
+
+  Future<bool> _onWillPop() async {
+    if (_estadoDropdownAberto || _municipioDropdownAberto) {
+      if (_estadoDropdownAberto) _fecharDropdownEstado();
+      if (_municipioDropdownAberto) _fecharDropdownMunicipio();
+      return true;
+    }
+    return true;
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -1457,6 +1481,8 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
   final _ubsFocusNode = FocusNode();
   final _ubsFieldKey = GlobalKey();
   final _ubsOverlayController = OverlayPortalController();
+  
+  ModalRoute<dynamic>? _modalRoute;
 
   List<CnesEstabelecimento> _todasUbs = [];
   List<CnesEstabelecimento> _ubsFiltradas = [];
@@ -1494,6 +1520,19 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _modalRoute) {
+      if (_modalRoute != null) {
+        _modalRoute!.removeScopedWillPopCallback(_onWillPop);
+      }
+      _modalRoute = route;
+      _modalRoute?.addScopedWillPopCallback(_onWillPop);
+    }
+  }
+
+  @override
   void dispose() {
     _ubsController.removeListener(_onUbsChanged);
     _ubsFocusNode.removeListener(_onUbsFocusChanged);
@@ -1501,6 +1540,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
     _email.dispose();
     _ubsController.dispose();
     _ubsFocusNode.dispose();
+    _modalRoute?.removeScopedWillPopCallback(_onWillPop);
     super.dispose();
   }
 
@@ -1607,6 +1647,14 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
     if (box == null) return (Offset.zero, 300);
     final offset = box.localToGlobal(Offset.zero);
     return (Offset(offset.dx, offset.dy + box.size.height + 4), box.size.width);
+  }
+
+  Future<bool> _onWillPop() async {
+    if (_ubsDropdownAberto) {
+      _fecharDropdown();
+      return true;
+    }
+    return true;
   }
 
   @override
@@ -2096,6 +2144,8 @@ class _EditEmergencyContactPageState extends State<EditEmergencyContactPage> {
   bool _relationshipDropdownAberto = false;
   String? _emergencyRelationship;
 
+  ModalRoute<dynamic>? _modalRoute;
+
   final List<String> _relationships = [
     'Pai',
     'Mãe',
@@ -2130,11 +2180,25 @@ class _EditEmergencyContactPageState extends State<EditEmergencyContactPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _modalRoute) {
+      if (_modalRoute != null) {
+        _modalRoute!.removeScopedWillPopCallback(_onWillPop);
+      }
+      _modalRoute = route;
+      _modalRoute?.addScopedWillPopCallback(_onWillPop);
+    }
+  }
+
+  @override
   void dispose() {
     _emergencyName.dispose();
     _emergencyPhone.dispose();
     _relationshipController.dispose();
     _relationshipFocusNode.dispose();
+    _modalRoute?.removeScopedWillPopCallback(_onWillPop);
     super.dispose();
   }
 
@@ -2183,28 +2247,36 @@ class _EditEmergencyContactPageState extends State<EditEmergencyContactPage> {
     return Rect.fromLTWH(offset.dx, top, size.width, maxHeight);
   }
 
+  Future<bool> _onWillPop() async {
+    if (_relationshipDropdownAberto) {
+      _fecharDropdownParentesco();
+      return true;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contato de emergência'),
-        elevation: 0,
-        scrolledUnderElevation: 0.0,
-        surfaceTintColor: Colors.transparent,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        shadowColor: Colors.transparent,
-      ),
-      body: GestureDetector(
-        onTap: () {
-          FocusScope.of(context).unfocus();
-          _fecharDropdownParentesco();
-        },
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
+        appBar: AppBar(
+          title: const Text('Contato de emergência'),
+          elevation: 0,
+          scrolledUnderElevation: 0.0,
+          surfaceTintColor: Colors.transparent,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shadowColor: Colors.transparent,
+        ),
+        body: GestureDetector(
+          onTap: () {
+            FocusScope.of(context).unfocus();
+            _fecharDropdownParentesco();
+          },
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
               const SizedBox(height: 8),
               Text(
                 'Contato de emergência (opcional)',
