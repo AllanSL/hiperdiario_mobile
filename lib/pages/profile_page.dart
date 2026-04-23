@@ -173,12 +173,22 @@ class ProfilePage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        _InfoCard(
+            _InfoCard(
           rows: [
             _InfoRow.compact(formatPhoneDisplay(p.contact), icon: Icons.phone),
             if (p.email != null && p.email!.isNotEmpty)
               _InfoRow.compact(p.email!, icon: Icons.email),
-            _InfoRow.compact(p.ubsName ?? p.ubs, icon: Icons.local_hospital),
+            _InfoRow.compact(
+              // Exibe nome formatado da UBS quando disponível; caso contrário,
+              // mostramos um placeholder amigável para indicar que não há UBS.
+              (() {
+                final resolved = (p.ubsName != null && p.ubsName!.isNotEmpty)
+                    ? p.ubsName!
+                    : (p.ubs.isNotEmpty ? p.ubs : 'UBS não informada');
+                return formatCnesDisplayName(resolved);
+              })(),
+              icon: Icons.local_hospital,
+            ),
             if (p.address != null && p.address!.isNotEmpty)
               _InfoRow.compact(p.address!, icon: Icons.home),
           ],
@@ -1454,22 +1464,22 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
   @override
   void initState() {
     super.initState();
-    final p = context.read<AppState>().patient!;
+    final p = context.read<AppState>().patient;
 
     final formattedPhone = PhoneInputFormatter()
         .formatEditUpdate(
           TextEditingValue.empty,
-          TextEditingValue(text: p.contact),
+          TextEditingValue(text: p?.contact ?? ''),
         )
         .text;
 
     _phone = TextEditingController(text: formattedPhone);
-    _email = TextEditingController(text: p.email ?? '');
+    _email = TextEditingController(text: p?.email ?? '');
 
     // Mostra o nome fantasia se disponível, caso contrário cai pro código
-    if (p.ubsName != null && p.ubsName!.isNotEmpty) {
+    if (p?.ubsName != null && p!.ubsName!.isNotEmpty) {
       _ubsController.text = p.ubsName!;
-    } else if (p.ubs != 'UBS não informada') {
+    } else if (p?.ubs != null && p!.ubs != 'UBS não informada') {
       _ubsController.text = p.ubs;
     } else {
       _ubsController.text = ''; // Mostra vazio para o usuário preencher
@@ -1518,13 +1528,13 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
 
         // Se já tivermos um código cnes (p.ubs) e acabarmos de carregar as UBSs,
         // substituímos o texto pelo nome fantasia da UBS encontrada.
-        if (patient?.ubs != null && patient!.ubs.isNotEmpty) {
+            if (patient?.ubs != null && patient!.ubs.isNotEmpty) {
           try {
             final ubsMatcheada = _todasUbs.firstWhere(
               (ubs) => ubs.codigoCnes.toString() == patient.ubs,
             );
             _ubsSelecionada = ubsMatcheada;
-            _ubsController.text = ubsMatcheada.nomeFantasia;
+            _ubsController.text = ubsMatcheada.displayText;
           } catch (_) {
             // Nenhuma correspondência encontrada.
           }
@@ -1542,6 +1552,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
                 .where(
                   (e) =>
                       e.nomeFantasia.toLowerCase().contains(q) ||
+                      e.displayText.toLowerCase().contains(q) ||
                       e.endereco.toLowerCase().contains(q),
                 )
                 .toList();
@@ -1583,9 +1594,9 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
 
   void _selecionarEstabelecimento(CnesEstabelecimento est) {
     _ubsSelecionada = est;
-    _ubsController.text = est.nomeFantasia;
+    _ubsController.text = est.displayText;
     _ubsController.selection = TextSelection.collapsed(
-      offset: est.nomeFantasia.length,
+      offset: est.displayText.length,
     );
     _fecharDropdown();
     _ubsFocusNode.unfocus();
@@ -1600,8 +1611,22 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.read<AppState>().patient!;
+    final p = context.read<AppState>().patient;
     final colorScheme = Theme.of(context).colorScheme;
+
+    if (p == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Editar contatos pessoais'),
+          elevation: 0,
+          scrolledUnderElevation: 0.0,
+          surfaceTintColor: Colors.transparent,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shadowColor: Colors.transparent,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return GestureDetector(
       onTap: () {
@@ -1764,7 +1789,9 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
                   decoration: AppInputDecoration.build(
                     context,
                     labelText: 'UBS de referência',
-                    hintText: 'Toque para ver as UBS ou digite para filtrar',
+                    hintText: _ubsController.text.trim().isEmpty
+                        ? 'Nenhuma UBS selecionada'
+                        : 'Toque para ver as UBS ou digite para filtrar',
                     prefixIcon: Icon(
                       Icons.local_hospital,
                       color: colorScheme.primary,
@@ -2018,7 +2045,7 @@ class _DropdownUbsLocal extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          est.nomeFantasia,
+                          est.displayText,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: colorScheme.onSurface,

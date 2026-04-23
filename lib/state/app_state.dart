@@ -1062,19 +1062,33 @@ class AppState extends ChangeNotifier {
     if (_patient == null) return;
 
     try {
-      await _supabase
-          .from('users')
-          .update({'uf': siglaUf, 'municipio_ibge': codigoMunicipio})
-          .eq('cpf', _patient!.cpf);
+      // Se o município mudou, limpamos também a UBS de referência para
+      // forçar o usuário a selecionar uma UBS no novo município.
+      final bool municipioMudou = _patient!.codigoMunicipio != codigoMunicipio;
+      final payload = <String, dynamic>{
+        'uf': siglaUf,
+        'municipio_ibge': codigoMunicipio,
+      };
+      if (municipioMudou) {
+        payload['ubs_cnes'] = '';
+        payload['ubs_name'] = '';
+      }
+
+      await _supabase.from('users').update(payload).eq('cpf', _patient!.cpf);
     } catch (e) {
       debugPrint('Erro ao atualizar localização no Supabase: $e');
     }
 
+    // Atualiza o estado local do paciente. Quando o município mudou,
+    // também limparemos os campos `ubs` e `ubsName` em memória.
+    final bool municipioMudou = _patient!.codigoMunicipio != codigoMunicipio;
     _patient = _patient!.copyWith(
       codigoUf: codigoUf,
       siglaUf: siglaUf,
       codigoMunicipio: codigoMunicipio,
       nomeMunicipio: nomeMunicipio,
+      ubs: municipioMudou ? '' : _patient!.ubs,
+      ubsName: municipioMudou ? '' : _patient!.ubsName,
     );
     notifyListeners();
   }

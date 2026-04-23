@@ -781,10 +781,12 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                   },
                   child: TextFormField(
                     key: _locationFieldKey,
-                    controller: _locationController,
+                    controller: _locationModoDigitacao
+                      ? _locationController
+                      : TextEditingController(text: formatCnesDisplayName(_locationController.text)),
                     focusNode: _locationFocusNode,
                     enabled: !_locationFixa,
-                    readOnly: true,
+                    readOnly: !_locationModoDigitacao,
                     onTap: _locationFixa ? null : _onLocationTap,
                     textCapitalization: TextCapitalization.words,
                     decoration: AppInputDecoration.build(
@@ -1299,7 +1301,7 @@ class _DropdownCnes extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          est.nomeFantasia,
+                          est.displayText,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: colorScheme.onSurface,

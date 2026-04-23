@@ -3,6 +3,37 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Formata visualmente nomes de estabelecimentos CNES.
+/// Substitui o prefixo longo "Unidade Básica de Saúde" por "UBS" apenas para exibição.
+String formatCnesDisplayName(String name) {
+  if (name.trim().isEmpty) return name;
+  final s = name.trim();
+
+  // Padrões de prefixo comuns que equivalem a uma UBS/Unidade de Saúde.
+  // Quando encontrados no início do nome, substituímos por "UBS" para
+  // exibição (mantendo o restante do nome). Também tratamos abreviações
+  // e variações como 'UNIDADE B', 'UB', 'UBS', 'Posto de Saúde', etc.
+  final patterns = <String>[
+    r'^\s*(?:unidade\s+(?:b[aá]sica|basica)(?:\s+de\s+(?:saude|saúde))?)\s*[:\-–—]?\s*',
+    r'^\s*(?:unidade|unid)\s+([^\s,;:]{1,8})(?:\s+de\s+(?:saude|saúde))?\s*[:\-–—]?\s*',
+    r'^\s*(?:ubs)\s*[:\-–—]?\s*',
+    r'^\s*(?:ub)\s*(?:de\s+(?:saude|saúde))?\s*[:\-–—]?\s*',
+    r'^\s*(?:posto\s+de\s+(?:saude|saúde))\s*[:\-–—]?\s*',
+    r'^\s*(?:centro\s+de\s+(?:saude|saúde))\s*[:\-–—]?\s*',
+  ];
+
+  for (final pat in patterns) {
+    final regex = RegExp(pat, caseSensitive: false, unicode: true);
+    final match = regex.firstMatch(s);
+    if (match != null) {
+      final rest = s.replaceFirst(regex, '').trim();
+      return rest.isEmpty ? 'UBS' : 'UBS $rest';
+    }
+  }
+
+  return name;
+}
+
 /// Representa um estabelecimento de saúde retornado pela API CNES.
 class CnesEstabelecimento {
   final int codigoCnes;
@@ -34,7 +65,7 @@ class CnesEstabelecimento {
   }
 
   /// Texto exibido no campo de texto após selecionar a opção.
-  String get displayText => nomeFantasia;
+  String get displayText => formatCnesDisplayName(nomeFantasia);
 
   @override
   String toString() => nomeFantasia;
