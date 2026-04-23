@@ -1121,7 +1121,7 @@ class AppState extends ChangeNotifier {
     if (user == null) return;
 
     try {
-      final name = '${disp.activePrinciple} ${disp.strength}';
+      final name = disp.activePrinciple;
 
       final doc = {
         'owner_id': user.id,
