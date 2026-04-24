@@ -146,10 +146,10 @@ class _MedicationTile extends StatelessWidget {
                       Flexible(
                         child: Text(
                           m.name,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
                       if (m.dispensationId != null) ...[
@@ -337,13 +337,12 @@ class _MedicationTile extends StatelessWidget {
                 children: [
                   if (isLow)
                     Chip(
-                      label: const Text('Estoque baixo'),
+                      label: Text('Estoque baixo'),
                       backgroundColor: colorScheme.errorContainer,
-                      labelStyle: TextStyle(
-                        color: colorScheme.onErrorContainer,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 18,
-                      ),
+                      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
                       side: BorderSide(
                         color: colorScheme.error.withValues(alpha: 0.4),
                       ),
@@ -356,10 +355,9 @@ class _MedicationTile extends StatelessWidget {
                   Chip(
                     label: Text('Estoque: ${m.stockUnits}'),
                     backgroundColor: colorScheme.primaryContainer,
-                    labelStyle: TextStyle(
-                      color: colorScheme.onPrimaryContainer,
-                      fontSize: 18,
-                    ),
+                    labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                        ),
                     side: BorderSide(
                       color: colorScheme.primary.withValues(alpha: 0.4),
                     ),
