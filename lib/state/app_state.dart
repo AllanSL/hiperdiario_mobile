@@ -589,7 +589,11 @@ class AppState extends ChangeNotifier {
               if (timesChanged && newTimes.isNotEmpty) {
                 updateMap['frequency'] = newTimes;
               }
-              if (webStock != currentStock) {
+
+              // Evita sobrescrever um estoque definido manualmente no servidor.
+              // Atualiza o stock a partir da dispensa apenas quando o estoque
+              // atual estiver ausente/zero (regra conservadora).
+              if (webStock > 0 && currentStock <= 0) {
                 updateMap['stock'] = webStock;
               }
 
