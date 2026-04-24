@@ -642,6 +642,22 @@ class AppState extends ChangeNotifier {
               }
             }
 
+            // Se houver um array de horários, derivamos o rótulo a partir dele
+            String? computedFreqLabel;
+            if (timesList.isNotEmpty) {
+              final parsed = <TimeOfDayLite>[];
+              for (final s in timesList) {
+                final parts = s.split(':');
+                if (parts.length >= 2) {
+                  final h = int.tryParse(parts[0]) ?? 0;
+                  final m = int.tryParse(parts[1]) ?? 0;
+                  parsed.add(TimeOfDayLite(h, m));
+                }
+              }
+              final derived = _deriveFrequencyLabelFromTimes(parsed);
+              computedFreqLabel = derived ?? '${parsed.length}x ao dia';
+            }
+
             return PendingDispensation(
               id: map['id'].toString(),
               activePrinciple: catalog['active_principle']?.toString() ?? 'Medicamento Local',
@@ -651,7 +667,7 @@ class AppState extends ChangeNotifier {
               dispensedAt: DateTime.tryParse(map['dispensed_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
               prescribingDoctor: map['prescribing_doctor']?.toString() ?? 'Não informado',
               frequencyPerDay: int.tryParse(map['frequency_per_day']?.toString() ?? '1') ?? 1,
-              frequencyLabel: map['frequency_label']?.toString(),
+              frequencyLabel: computedFreqLabel ?? map['frequency_label']?.toString(),
               scheduledTimes: timesList,
             );
           }).toList();
@@ -834,16 +850,67 @@ class AppState extends ChangeNotifier {
     return times;
   }
 
+  String? _deriveFrequencyLabelFromTimes(List<TimeOfDayLite> times) {
+    if (times.isEmpty) return null;
+    final n = times.length;
+    if (n == 1) return '1x ao dia';
+
+    final minutes = times.map((t) => t.hour * 60 + t.minute).toList();
+    minutes.sort();
+    final diffs = <int>[];
+    for (var i = 0; i < minutes.length - 1; i++) {
+      diffs.add(minutes[i + 1] - minutes[i]);
+    }
+    // wrap-around diff
+    diffs.add((minutes[0] + 24 * 60) - minutes.last);
+
+    final expected = 24 * 60 / n;
+    const tolerance = 30; // minutos
+    final approxEqual = diffs.every((d) => (d - expected).abs() <= tolerance);
+
+    if (!approxEqual) return null;
+
+    // Para 2/3/4 horários podemos mostrar o formato "12/12h", "8/8h", "6/6h"
+    if (n == 2 || n == 3 || n == 4) {
+      final hours = (expected / 60).round();
+      return '$hours/${hours}h';
+    }
+
+    return '${n}x ao dia';
+  }
+
   Medication _mapMedicationFromDb(Map<String, dynamic> row) {
     final stock = int.tryParse('${row['stock'] ?? 0}') ?? 0;
-    final dosage = (row['dosage_instructions'] ?? row['strength'] ?? '')
-        .toString();
+
+    final rawDosage = (row['dosage_instructions'] ?? '').toString();
+    final strength = (row['strength'] ?? '').toString();
+    final times = _parseMedicationTimes(row['frequency']);
+    final freqLabel = _deriveFrequencyLabelFromTimes(times) ?? (times.isNotEmpty ? '${times.length}x ao dia' : null);
+
+    String dosage;
+    if (rawDosage.trim().isEmpty) {
+      if (strength.isNotEmpty && freqLabel != null) {
+        dosage = '${strength.trim()} $freqLabel';
+      } else if (strength.isNotEmpty) {
+        dosage = strength.trim();
+      } else if (freqLabel != null) {
+        dosage = freqLabel;
+      } else {
+        dosage = 'Sem posologia informada';
+      }
+    } else {
+      final freqRegex = RegExp(r'\b(?:\d+\s*x\s*(?:ao dia|/dia)?|\d+\/\d+\s*h)\b', caseSensitive: false);
+      final cleaned = rawDosage.replaceAll(freqRegex, '').trim();
+      final base = cleaned.isNotEmpty ? cleaned : (strength.isNotEmpty ? strength.trim() : rawDosage.trim());
+      dosage = freqLabel != null ? '$base $freqLabel'.trim() : base;
+      if (dosage.isEmpty) dosage = 'Sem posologia informada';
+    }
 
     return Medication(
       id: (row['remote_id'] ?? row['id']).toString(),
       name: (row['name'] ?? 'Medicamento').toString(),
-      dosage: dosage.isEmpty ? 'Sem posologia informada' : dosage,
-      times: _parseMedicationTimes(row['frequency']),
+      dosage: dosage,
+      times: times,
       stockUnits: stock,
       dispensationId: row['dispensation_id']?.toString(),
     );
