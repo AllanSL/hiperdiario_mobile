@@ -870,12 +870,9 @@ class AppState extends ChangeNotifier {
 
     if (!approxEqual) return null;
 
-    // Para 2/3/4 horários podemos mostrar o formato "12/12h", "8/8h", "6/6h"
-    if (n == 2 || n == 3 || n == 4) {
-      final hours = (expected / 60).round();
-      return '$hours/${hours}h';
-    }
-
+    // Usamos um rótulo consistente do tipo 'Nx ao dia' para exibição
+    // (por exemplo '2x ao dia', '3x ao dia', etc.), mantendo a forma
+    // legível e consistente com medicamentos criados pelo usuário.
     return '${n}x ao dia';
   }
 
