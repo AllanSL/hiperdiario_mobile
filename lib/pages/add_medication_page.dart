@@ -99,6 +99,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     '100 mg',
     '125 mg',
     '250 mg',
+    '300 mg',
     '500 mg',
     '750 mg',
     '1 g',
