@@ -1309,6 +1309,93 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> decrementMedicationStock(String medId, {int by = 1}) async {
+    final idx = _medications.indexWhere((e) => e.id == medId);
+    if (idx == -1) return;
+
+    final oldMed = _medications[idx];
+    final current = oldMed.stockUnits;
+    final newStock = (current - by) < 0 ? 0 : (current - by);
+
+    final updatedMed = Medication(
+      id: oldMed.id,
+      name: oldMed.name,
+      dosage: oldMed.dosage,
+      times: oldMed.times,
+      stockUnits: newStock,
+      dispensationId: oldMed.dispensationId,
+    );
+
+    _medications = _medications.map((e) => e.id == medId ? updatedMed : e).toList();
+    notifyListeners();
+
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        final targetId = oldMed.id;
+        final isNumeric = int.tryParse(targetId) != null && targetId.length < 13;
+        final doc = {'stock': newStock};
+        if (isNumeric) {
+          await _supabase.from('medications').update(doc).eq('id', targetId).eq('owner_id', user.id);
+        } else {
+          await _supabase.from('medications').update(doc).eq('remote_id', targetId).eq('owner_id', user.id);
+        }
+      } catch (e) {
+        debugPrint('Erro ao sincronizar estoque (decrement): $e');
+      }
+    }
+
+    if (newStock <= 0) {
+      try {
+        await NotificationService.instance.cancelMedicationNotifications(medId);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> incrementMedicationStock(String medId, {int by = 1}) async {
+    final idx = _medications.indexWhere((e) => e.id == medId);
+    if (idx == -1) return;
+
+    final oldMed = _medications[idx];
+    final current = oldMed.stockUnits;
+    final newStock = current + by;
+
+    final updatedMed = Medication(
+      id: oldMed.id,
+      name: oldMed.name,
+      dosage: oldMed.dosage,
+      times: oldMed.times,
+      stockUnits: newStock,
+      dispensationId: oldMed.dispensationId,
+    );
+
+    _medications = _medications.map((e) => e.id == medId ? updatedMed : e).toList();
+    notifyListeners();
+
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        final targetId = oldMed.id;
+        final isNumeric = int.tryParse(targetId) != null && targetId.length < 13;
+        final doc = {'stock': newStock};
+        if (isNumeric) {
+          await _supabase.from('medications').update(doc).eq('id', targetId).eq('owner_id', user.id);
+        } else {
+          await _supabase.from('medications').update(doc).eq('remote_id', targetId).eq('owner_id', user.id);
+        }
+      } catch (e) {
+        debugPrint('Erro ao sincronizar estoque (increment): $e');
+      }
+    }
+
+    // Se havia estoque 0 e agora voltou a ter, reagendamos lembretes
+    if (oldMed.stockUnits <= 0 && newStock > 0) {
+      try {
+        await NotificationService.instance.scheduleMedicationReminders(updatedMed);
+      } catch (_) {}
+    }
+  }
+
   Future<void> removeMedication(String id) async {
     final user = _supabase.auth.currentUser;
     if (user != null) {

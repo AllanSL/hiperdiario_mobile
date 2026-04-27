@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
+import '../core/models/medication.dart';
+import '../core/services/notification_service.dart';
 
 import '../state/app_state.dart';
 import '../core/providers/theme_provider.dart';
@@ -36,6 +39,7 @@ class _HomePageState extends State<HomePage> {
   // Bloqueio de navegação para evitar spam de cliques nas guias
   bool _isNavigating = false;
   Timer? _navigationReleaseTimer;
+  StreamSubscription<String>? _notificationResponseSub;
 
   @override
   void initState() {
@@ -46,6 +50,14 @@ class _HomePageState extends State<HomePage> {
     _canShowMedFab = _index == 1;
     _canShowAppointmentFab = _index == 2;
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateFabVisibility());
+    // Inscreve-se nas respostas de notificações (quando o usuário interage)
+    _notificationResponseSub =
+        NotificationService.instance.onNotificationResponse.listen((payload) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _onNotificationPayloadReceived(payload);
+      });
+    });
   }
 
   @override
@@ -53,9 +65,51 @@ class _HomePageState extends State<HomePage> {
     _medFabTimer?.cancel();
     _appointmentFabTimer?.cancel();
     _navigationReleaseTimer?.cancel();
+    _notificationResponseSub?.cancel();
     _pageController.removeListener(_onPageControllerScroll);
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _onNotificationPayloadReceived(String payload) async {
+    String? medId;
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      if (data['type'] == 'med_reminder') medId = data['medId']?.toString();
+    } catch (_) {
+      final reg = RegExp(r'"medId"\s*:\s*"([^\"]+)"');
+      final match = reg.firstMatch(payload);
+      if (match != null && match.groupCount >= 1) medId = match.group(1);
+    }
+
+    if (medId == null || medId.isEmpty) return;
+
+    final appState = context.read<AppState>();
+    Medication? med;
+    try {
+      med = appState.medications.firstWhere((m) => m.id == medId);
+    } catch (_) {
+      med = null;
+    }
+    if (med == null) return;
+    final m = med;
+
+    if (!mounted) return;
+    final took = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tomou o remédio?'),
+        content: Text('${m.name}\n${m.dosage}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Não')),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Tomei')),
+        ],
+      ),
+    );
+
+    if (took == true) {
+      await appState.decrementMedicationStock(m.id, by: 1);
+    }
   }
 
   void _onPageControllerScroll() {

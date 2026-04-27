@@ -123,228 +123,248 @@ class _MedicationTile extends StatelessWidget {
         ? timesPerDay * lowStockDaysThreshold
         : 5;
     final isLow = m.stockUnits <= thresholdUnits;
+    final isDisabled = m.stockUnits <= 0;
+
     return Card(
       elevation: 0,
+      color: isDisabled ? Theme.of(context).colorScheme.surfaceContainerHighest : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isLow ? Colors.red.shade200 : colorScheme.outline,
+          color: isDisabled
+              ? Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(80)
+              : (isLow ? Colors.red.shade200 : colorScheme.outline),
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Primeira linha: Nome + Menu de ações
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          m.name,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      if (m.dispensationId != null) ...[
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: 'Medicamento retirado no SUS',
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'SUS',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ),
+      child: Opacity(
+        opacity: isDisabled ? 0.5 : 1.0,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Primeira linha: Nome + Menu de ações
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            m.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Mais ações',
-                  iconColor: colorScheme.primary,
-                  onSelected: (value) async {
-                    if (value == 'edit') {
-                      final result = await Navigator.of(context).push<String>(
-                        MaterialPageRoute(
-                          builder: (_) => AddMedicationPage(initial: m),
-                        ),
-                      );
-                      if (result == 'updated' && context.mounted) {
-                        ScaffoldMessenger.of(rootContext).showSnackBar(
-                          SnackBar(
-                            behavior: SnackBarBehavior.floating,
-                            margin: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.primaryContainer,
-                            duration: const Duration(seconds: 2),
-                            content: Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle_outline,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimaryContainer,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Medicamento atualizado',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimaryContainer,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                    } else if (value == 'delete' && m.dispensationId == null) {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Excluir medicamento'),
-                          content: Text('Deseja excluir "${m.name}"?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Cancelar'),
-                            ),
-                            FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Theme.of(
-                                  ctx,
-                                ).colorScheme.error,
-                              ),
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('Excluir'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirmed == true && context.mounted) {
-                        // Mostra o toast imediatamente
-                        final theme = Theme.of(rootContext);
-                        final messenger = ScaffoldMessenger.of(rootContext);
-                        messenger.showSnackBar(
-                          SnackBar(
-                            behavior: SnackBarBehavior.floating,
-                            margin: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            backgroundColor: theme.colorScheme.error,
-                            duration: const Duration(seconds: 2),
-                            content: Row(
-                              children: [
-                                Icon(
-                                  Icons.delete_outline,
-                                  color: theme.colorScheme.onError,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Medicamento excluído',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: theme.colorScheme.onError,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                        // Remove o medicamento
-                        await context.read<AppState>().removeMedication(m.id);
-                      }
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.edit,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
+                        if (m.dispensationId != null) ...[
                           const SizedBox(width: 8),
-                          Text(
-                            'Editar',
-                            style: TextStyle(color: colorScheme.primary),
+                          Tooltip(
+                            message: 'Medicamento retirado no SUS',
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'SUS',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
-                    if (m.dispensationId == null)
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Mais ações',
+                    iconColor: colorScheme.primary,
+                    onSelected: (value) async {
+                      if (value == 'edit') {
+                        final result = await Navigator.of(context).push<String>(
+                          MaterialPageRoute(
+                            builder: (_) => AddMedicationPage(initial: m),
+                          ),
+                        );
+                        if (result == 'updated' && context.mounted) {
+                          ScaffoldMessenger.of(rootContext).showSnackBar(
+                            SnackBar(
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.all(16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primaryContainer,
+                              duration: const Duration(seconds: 2),
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Medicamento atualizado',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                      } else if (value == 'delete' && m.dispensationId == null) {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Excluir medicamento'),
+                            content: Text('Deseja excluir "${m.name}"?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('Cancelar'),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor:
+                                      Theme.of(ctx).colorScheme.error,
+                                ),
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('Excluir'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true && context.mounted) {
+                          final theme = Theme.of(rootContext);
+                          final messenger = ScaffoldMessenger.of(rootContext);
+                          messenger.showSnackBar(
+                            SnackBar(
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.all(16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              backgroundColor: theme.colorScheme.error,
+                              duration: const Duration(seconds: 2),
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline,
+                                    color: theme.colorScheme.onError,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Medicamento excluído',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onError,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                          await context.read<AppState>().removeMedication(m.id);
+                        }
+                      }
+                    },
+                    itemBuilder: (ctx) => [
                       PopupMenuItem(
-                        value: 'delete',
+                        value: 'edit',
                         child: Row(
                           children: [
                             Icon(
-                              Icons.delete,
+                              Icons.edit,
                               size: 20,
-                              color: colorScheme.error,
+                              color: colorScheme.primary,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Excluir',
-                              style: TextStyle(color: colorScheme.error),
+                              'Editar',
+                              style: TextStyle(color: colorScheme.primary),
                             ),
                           ],
                         ),
                       ),
-                  ],
-                ),
-              ],
-            ),
-            // Segunda linha: Chips de estoque
-            if (isLow || m.stockUnits >= 0)
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  if (isLow)
-                    Chip(
-                      label: Text('Estoque baixo'),
-                      backgroundColor: colorScheme.errorContainer,
-                      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: colorScheme.onErrorContainer,
-                            fontWeight: FontWeight.w600,
+                      if (m.dispensationId == null)
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete,
+                                size: 20,
+                                color: colorScheme.error,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Excluir',
+                                style: TextStyle(color: colorScheme.error),
+                              ),
+                            ],
                           ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              // Segunda linha: Chips de estoque
+              if (isLow || m.stockUnits >= 0)
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    if (isLow)
+                      Chip(
+                        label: Text('Estoque baixo'),
+                        backgroundColor: colorScheme.errorContainer,
+                        labelStyle:
+                            Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: colorScheme.onErrorContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                        side: BorderSide(
+                          color: colorScheme.error.withValues(alpha: 0.4),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 0,
+                        ),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    Chip(
+                      label: Text(m.stockUnits > 0 ? 'Estoque: ${m.stockUnits}' : 'Sem estoque'),
+                      backgroundColor: colorScheme.primaryContainer,
+                      labelStyle: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(color: colorScheme.onPrimaryContainer),
                       side: BorderSide(
-                        color: colorScheme.error.withValues(alpha: 0.4),
+                        color: colorScheme.primary.withValues(alpha: 0.4),
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -352,34 +372,20 @@ class _MedicationTile extends StatelessWidget {
                       ),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  Chip(
-                    label: Text('Estoque: ${m.stockUnits}'),
-                    backgroundColor: colorScheme.primaryContainer,
-                    labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: colorScheme.onPrimaryContainer,
-                        ),
-                    side: BorderSide(
-                      color: colorScheme.primary.withValues(alpha: 0.4),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 0,
-                    ),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                  ],
+                ),
+              const SizedBox(height: 8),
+              Text(m.dosage),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(Icons.access_time, size: 18, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(timesStr),
                 ],
               ),
-            const SizedBox(height: 8),
-            Text(m.dosage),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 18, color: colorScheme.primary),
-                const SizedBox(width: 6),
-                Text(timesStr),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -13,13 +15,26 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   final _plugin = FlutterLocalNotificationsPlugin();
+  final StreamController<String> _responseController = StreamController.broadcast();
+  Stream<String> get onNotificationResponse => _responseController.stream;
+
+  // Mapeia medId -> lista de notification ids agendadas para esse medicamento
+  final Map<String, List<int>> _medNotificationIds = {};
 
   Future<void> init() async {
     if (kIsWeb) return; // Web: ignorar inicialização
     
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(initSettings,
+        onDidReceiveNotificationResponse: (response) {
+      try {
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          _responseController.add(payload);
+        }
+      } catch (_) {}
+    });
 
     // Criar canais de notificação no Android 8+
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -212,6 +227,7 @@ class NotificationService {
     
     // Agenda lembretes para cada horário configurado
     // Agendando para os próximos 30 dias
+    _medNotificationIds.remove(med.id);
     for (final time in med.times) {
       final now = DateTime.now();
       
@@ -222,13 +238,16 @@ class NotificationService {
         // Só agenda se for no futuro
         if (scheduledDate.isAfter(now)) {
           try {
+            final id = _randomId();
             await _zonedSchedule(
-              id: _randomId(),
+              id: id,
               title: 'Hora do remédio',
               body: '${med.name} — ${med.dosage}',
               when: scheduledDate,
               androidChannelId: 'medications',
+              payload: jsonEncode({'type': 'med_reminder', 'medId': med.id}),
             );
+            _medNotificationIds.putIfAbsent(med.id, () => []).add(id);
           } catch (e) {
             // Silenciosamente continua se houver erro
           }
@@ -243,6 +262,7 @@ class NotificationService {
     required String body,
     required DateTime when,
     String androidChannelId = 'reminders',
+    String? payload,
   }) async {
     final tzTime = tz.TZDateTime.from(when, tz.local);
     
@@ -266,7 +286,19 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.exact,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      payload: payload,
     );
+  }
+
+  Future<void> cancelMedicationNotifications(String medId) async {
+    final ids = _medNotificationIds[medId];
+    if (ids == null || ids.isEmpty) return;
+    for (final id in ids) {
+      try {
+        await _plugin.cancel(id);
+      } catch (_) {}
+    }
+    _medNotificationIds.remove(medId);
   }
 
   int _randomId() => Random().nextInt(1 << 31);
