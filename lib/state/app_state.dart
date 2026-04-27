@@ -879,31 +879,53 @@ class AppState extends ChangeNotifier {
     return '${n}x ao dia';
   }
 
+  String _normalizeDoseText(String s) {
+    var t = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    t = t.replaceAllMapped(RegExp(r'(\d+(?:[.,]\d+)?)([A-Za-zµ%]+)'), (m) => '${m[1]} ${m[2]}');
+    return t;
+  }
+
+  String _extractBaseDose(String strength, String rawDosage) {
+    final s = strength.trim();
+    if (s.isNotEmpty) {
+      return _normalizeDoseText(s);
+    }
+
+    final freqRegex = RegExp(r'\b(?:\d+\s*x\s*(?:ao dia|/dia)?|\d+\/\d+\s*h)\b', caseSensitive: false);
+    final cleaned = rawDosage.replaceAll(freqRegex, '').trim();
+    if (cleaned.isEmpty) return 'Sem posologia informada';
+
+    // Composite like '250 mg/5 ml'
+    final composite = RegExp(r'(\d+(?:[.,]\d+)?)\s*(mg|g|ml|mcg|µg)\s*\/\s*(\d+(?:[.,]\d+)?)\s*(ml|g)', caseSensitive: false);
+    final compMatch = composite.firstMatch(cleaned);
+    if (compMatch != null) {
+      return _normalizeDoseText(compMatch.group(0)!);
+    }
+
+    final doseRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*(mg|g|ml|mcg|µg|iu|unidades|comprimad[oa]s?|cápsulas?)', caseSensitive: false);
+    final match = doseRegex.firstMatch(cleaned);
+    if (match != null) {
+      return _normalizeDoseText(match.group(0)!);
+    }
+
+    final first = cleaned.split(RegExp(r'[;,]')).first.trim();
+    return first.isNotEmpty ? first : 'Sem posologia informada';
+  }
+
   Medication _mapMedicationFromDb(Map<String, dynamic> row) {
     final stock = int.tryParse('${row['stock'] ?? 0}') ?? 0;
-
     final rawDosage = (row['dosage_instructions'] ?? '').toString();
     final strength = (row['strength'] ?? '').toString();
     final times = _parseMedicationTimes(row['frequency']);
     final freqLabel = _deriveFrequencyLabelFromTimes(times) ?? (times.isNotEmpty ? '${times.length}x ao dia' : null);
 
+    final base = _extractBaseDose(strength, rawDosage);
+
     String dosage;
-    if (rawDosage.trim().isEmpty) {
-      if (strength.isNotEmpty && freqLabel != null) {
-        dosage = '${strength.trim()} $freqLabel';
-      } else if (strength.isNotEmpty) {
-        dosage = strength.trim();
-      } else if (freqLabel != null) {
-        dosage = freqLabel;
-      } else {
-        dosage = 'Sem posologia informada';
-      }
+    if (base == 'Sem posologia informada') {
+      dosage = freqLabel ?? base;
     } else {
-      final freqRegex = RegExp(r'\b(?:\d+\s*x\s*(?:ao dia|/dia)?|\d+\/\d+\s*h)\b', caseSensitive: false);
-      final cleaned = rawDosage.replaceAll(freqRegex, '').trim();
-      final base = cleaned.isNotEmpty ? cleaned : (strength.isNotEmpty ? strength.trim() : rawDosage.trim());
-      dosage = freqLabel != null ? '$base $freqLabel'.trim() : base;
-      if (dosage.isEmpty) dosage = 'Sem posologia informada';
+      dosage = freqLabel != null ? '$base $freqLabel' : base;
     }
 
     return Medication(
