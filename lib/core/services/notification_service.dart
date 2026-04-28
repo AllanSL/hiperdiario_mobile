@@ -210,50 +210,68 @@ class NotificationService {
   }
 
   Future<void> scheduleMedicationReminders(Medication med) async {
+    await scheduleAllMedicationReminders([med]);
+  }
+
+  Future<void> scheduleAllMedicationReminders(List<Medication> meds) async {
     if (kIsWeb) return;
-    
-    // Verificar permissão primeiro
+    if (meds.isEmpty) return;
+
     final hasPermission = await hasExactAlarmPermission();
-    
     if (!hasPermission) {
       await requestExactAlarmPermission();
-      
-      // Verificar novamente
-      final hasPermissionNow = await hasExactAlarmPermission();
-      if (!hasPermissionNow) {
+      if (!await hasExactAlarmPermission()) {
         return;
       }
     }
-    
-    // Agenda lembretes para cada horário configurado
-    // Agendando para os próximos 30 dias
-    _medNotificationIds.remove(med.id);
-    for (final time in med.times) {
-      final now = DateTime.now();
-      
-      // Agenda para os próximos 30 dias
+
+    final grouped = _groupMedicationsByTime(meds);
+    final now = DateTime.now();
+    _medNotificationIds.clear();
+
+    for (final group in grouped.values) {
+      final timeLabel = _fmtTime(DateTime(now.year, now.month, now.day, group.time.hour, group.time.minute));
+      final medsAtTime = group.meds;
       for (int day = 0; day < 30; day++) {
-        var scheduledDate = DateTime(now.year, now.month, now.day, time.hour, time.minute).add(Duration(days: day));
-        
-        // Só agenda se for no futuro
-        if (scheduledDate.isAfter(now)) {
-          try {
-            final id = _randomId();
-            await _zonedSchedule(
-              id: id,
-              title: 'Hora do remédio',
-              body: '${med.name} — ${med.dosage}',
-              when: scheduledDate,
-              androidChannelId: 'medications',
-              payload: jsonEncode({'type': 'med_reminder', 'medId': med.id}),
-            );
+        final scheduledDate = DateTime(now.year, now.month, now.day, group.time.hour, group.time.minute).add(Duration(days: day));
+        if (!scheduledDate.isAfter(now)) continue;
+
+        try {
+          final id = _randomId();
+          final body = medsAtTime.length == 1
+              ? medsAtTime.first.name
+              : medsAtTime.map((m) => m.name).join(', ');
+          await _zonedSchedule(
+            id: id,
+            title: 'Hora do remédio',
+            body: body,
+            when: scheduledDate,
+            androidChannelId: 'medications',
+            payload: jsonEncode({
+              'type': 'med_reminder',
+              'medIds': medsAtTime.map((m) => m.id).toList(),
+              'scheduledTime': timeLabel,
+            }),
+          );
+          for (final med in medsAtTime) {
             _medNotificationIds.putIfAbsent(med.id, () => []).add(id);
-          } catch (e) {
-            // Silenciosamente continua se houver erro
           }
+        } catch (e) {
+          // Silenciosamente continua se houver erro
         }
       }
     }
+  }
+
+  Map<String, _MedicationGroup> _groupMedicationsByTime(List<Medication> meds) {
+    final groups = <String, _MedicationGroup>{};
+    for (final med in meds) {
+      for (final time in med.times) {
+        final key = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+        groups.putIfAbsent(key, () => _MedicationGroup(time, [])).meds.add(med);
+      }
+    }
+    return groups;
   }
 
   Future<void> _zonedSchedule({
@@ -291,18 +309,18 @@ class NotificationService {
   }
 
   Future<void> cancelMedicationNotifications(String medId) async {
-    final ids = _medNotificationIds[medId];
-    if (ids == null || ids.isEmpty) return;
-    for (final id in ids) {
-      try {
-        await _plugin.cancel(id);
-      } catch (_) {}
-    }
-    _medNotificationIds.remove(medId);
+    await cancelAll();
   }
 
   int _randomId() => Random().nextInt(1 << 31);
 
   String _fmtTime(DateTime dt) =>
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+}
+
+class _MedicationGroup {
+  final TimeOfDayLite time;
+  final List<Medication> meds;
+
+  _MedicationGroup(this.time, this.meds);
 }

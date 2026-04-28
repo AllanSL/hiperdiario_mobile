@@ -72,44 +72,124 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onNotificationPayloadReceived(String payload) async {
-    String? medId;
+    final medIds = <String>{};
+    String? scheduledTime;
+
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
-      if (data['type'] == 'med_reminder') medId = data['medId']?.toString();
+      if (data['type'] == 'med_reminder') {
+        scheduledTime = data['scheduledTime']?.toString();
+        if (data['medIds'] is List) {
+          for (final item in data['medIds'] as List) {
+            if (item != null) medIds.add(item.toString());
+          }
+        }
+        if (data['medId'] != null) {
+          medIds.add(data['medId']!.toString());
+        }
+      }
     } catch (_) {
       final reg = RegExp(r'"medId"\s*:\s*"([^\"]+)"');
       final match = reg.firstMatch(payload);
-      if (match != null && match.groupCount >= 1) medId = match.group(1);
+      if (match != null && match.groupCount >= 1) medIds.add(match.group(1)!);
     }
 
-    if (medId == null || medId.isEmpty) return;
+    if (medIds.isEmpty) return;
 
     final appState = context.read<AppState>();
-    Medication? med;
-    try {
-      med = appState.medications.firstWhere((m) => m.id == medId);
-    } catch (_) {
-      med = null;
-    }
-    if (med == null) return;
-    final m = med;
+    final meds = appState.medications
+        .where((m) => medIds.contains(m.id))
+        .toList();
+    if (meds.isEmpty) return;
 
     if (!mounted) return;
-    final took = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tomou o remédio?'),
-        content: Text('${m.name}\n${m.dosage}'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Não')),
-          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Tomei')),
-        ],
-      ),
+
+    final selected = Map<String, bool>.fromEntries(
+      meds.map((m) => MapEntry(m.id, true)),
     );
 
-    if (took == true) {
-      await appState.decrementMedicationStock(m.id, by: 1);
+    final confirmedIds = await showDialog<List<String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+              title: Text(
+                meds.length == 1
+                    ? 'Tomou seu remédio?'
+                    : 'Tomou seus remédios?',
+              ),
+              content: SizedBox(
+                width: MediaQuery.of(ctx).size.width * 0.92,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.65,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: meds.map((m) {
+                        return CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: selected[m.id] ?? true,
+                          onChanged: (value) {
+                            setState(() {
+                              selected[m.id] = value ?? false;
+                            });
+                          },
+                          title: Text(
+                            '${m.name} ${_extractDoseLabel(m.dosage)}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: const Text('Sair'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final selectedIds = meds
+                        .where((m) => selected[m.id] == true)
+                        .map((m) => m.id)
+                        .toList();
+                    Navigator.of(ctx).pop(selectedIds);
+                  },
+                  child: const Text('Tomei'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmedIds == null || confirmedIds.isEmpty) return;
+
+    await Future.wait(
+      confirmedIds.map((id) => appState.decrementMedicationStock(id, by: 1)),
+    );
+  }
+
+  String _extractDoseLabel(String dosage) {
+    final doseRegex = RegExp(
+      r'(\d+(?:[.,]\d+)?)\s*(mg|g|ml|mcg|µg|iu|unidades|comprimad[oa]s?|cápsulas?)',
+      caseSensitive: false,
+    );
+    final match = doseRegex.firstMatch(dosage);
+    if (match != null) {
+      return '${match.group(1)!.trim()} ${match.group(2)!.toLowerCase()}';
     }
+    return dosage.trim();
   }
 
   void _onPageControllerScroll() {

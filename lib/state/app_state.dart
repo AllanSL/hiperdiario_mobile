@@ -681,16 +681,14 @@ class AppState extends ChangeNotifier {
 
     notifyListeners();
 
-    // Cancela todas as notifica��es antigas e reagenda
+    // Cancela todas as notificações antigas e reagenda
     await NotificationService.instance.cancelAll();
 
-    // Agenda notifica��es conforme RF04 e RF07
+    // Agenda notificações conforme RF04 e RF07
     for (final appt in _appointments) {
       await NotificationService.instance.scheduleAppointmentReminders(appt);
     }
-    for (final med in _medications) {
-      await NotificationService.instance.scheduleMedicationReminders(med);
-    }
+    await NotificationService.instance.scheduleAllMedicationReminders(_medications);
   }
 
   Future<void> syncUbsData() async {
@@ -1210,9 +1208,10 @@ class AppState extends ChangeNotifier {
     _medications = [..._medications, m];
     notifyListeners();
     try {
-      await NotificationService.instance.scheduleMedicationReminders(m);
+      await NotificationService.instance.cancelAll();
+      await NotificationService.instance.scheduleAllMedicationReminders(_medications);
     } catch (e) {
-      // Ignora erro de notifica��es - n�o deve impedir salvamento
+      // Ignora erro de notificações - não deve impedir salvamento
     }
   }
 
@@ -1249,7 +1248,12 @@ class AppState extends ChangeNotifier {
       _pendingDispensations = _pendingDispensations.where((d) => d.id != disp.id).toList();
       notifyListeners();
       
-      await NotificationService.instance.scheduleMedicationReminders(newMed);
+      try {
+        await NotificationService.instance.cancelAll();
+        await NotificationService.instance.scheduleAllMedicationReminders(_medications);
+      } catch (e) {
+        // Ignora erro de notificações - não deve impedir salvamento
+      }
     } catch (e) {
       debugPrint('Erro ao reconhecer retirada de medicamento: $e');
     }
@@ -1295,14 +1299,12 @@ class AppState extends ChangeNotifier {
 
     _medications = _medications.map((e) => e.id == m.id ? m : e).toList();
     notifyListeners();
-    // Para simplificar, cancela e reagenda todos os lembretes de medica��o
+    // Para simplificar, cancela e reagenda todos os lembretes de medicação
     try {
       await NotificationService.instance.cancelAll();
-      for (final med in _medications) {
-        await NotificationService.instance.scheduleMedicationReminders(med);
-      }
+      await NotificationService.instance.scheduleAllMedicationReminders(_medications);
     } catch (e) {
-      // Ignora erro de notifica��es - n�o deve impedir salvamento
+      // Ignora erro de notificações - não deve impedir salvamento
     }
   }
 
@@ -1344,7 +1346,8 @@ class AppState extends ChangeNotifier {
 
     if (newStock <= 0) {
       try {
-        await NotificationService.instance.cancelMedicationNotifications(medId);
+        await NotificationService.instance.cancelAll();
+        await NotificationService.instance.scheduleAllMedicationReminders(_medications);
       } catch (_) {}
     }
   }
