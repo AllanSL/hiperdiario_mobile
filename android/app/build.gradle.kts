@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.example.hiperdiario"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = "28.2.13676358"
         // ndkVersion = flutter.ndkVersion
         // Nota: Desativado temporariamente para evitar a instalação automática do NDK
         // em ambientes com pouco espaço no disco do usuário. Para projetos que realmente
