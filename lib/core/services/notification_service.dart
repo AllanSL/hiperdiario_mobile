@@ -217,6 +217,9 @@ class NotificationService {
     if (kIsWeb) return;
     if (meds.isEmpty) return;
 
+    final availableMeds = meds.where((m) => m.stockUnits > 0).toList();
+    if (availableMeds.isEmpty) return;
+
     final hasPermission = await hasExactAlarmPermission();
     if (!hasPermission) {
       await requestExactAlarmPermission();
@@ -225,7 +228,7 @@ class NotificationService {
       }
     }
 
-    final grouped = _groupMedicationsByTime(meds);
+    final grouped = _groupMedicationsByTime(availableMeds);
     final now = DateTime.now();
     _medNotificationIds.clear();
 
