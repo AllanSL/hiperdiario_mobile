@@ -58,9 +58,9 @@ class AppointmentsPage extends StatelessWidget {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       itemCount: upcomingAppointments.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, index) {
         final appt = upcomingAppointments[index];
         return _AppointmentCard(appointment: appt, rootContext: context);
