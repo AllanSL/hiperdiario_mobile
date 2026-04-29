@@ -18,6 +18,8 @@ class NotificationService {
   final StreamController<String> _responseController = StreamController.broadcast();
   Stream<String> get onNotificationResponse => _responseController.stream;
 
+  String? _launchNotificationPayload;
+
   // Mapeia medId -> lista de notification ids agendadas para esse medicamento
   final Map<String, List<int>> _medNotificationIds = {};
 
@@ -35,6 +37,14 @@ class NotificationService {
         }
       } catch (_) {}
     });
+
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp == true) {
+      final payload = details?.notificationResponse?.payload;
+      if (payload != null && payload.isNotEmpty) {
+        _launchNotificationPayload = payload;
+      }
+    }
 
     // Criar canais de notificação no Android 8+
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -109,6 +119,13 @@ class NotificationService {
   Future<void> cancelAll() async {
     if (kIsWeb) return;
     await _plugin.cancelAll();
+  }
+
+  /// Retorna a payload da notificação que abriu o app e consome o valor.
+  String? popLaunchNotificationPayload() {
+    final payload = _launchNotificationPayload;
+    _launchNotificationPayload = null;
+    return payload;
   }
 
   /// Lista todas as notificações pendentes (para debug)

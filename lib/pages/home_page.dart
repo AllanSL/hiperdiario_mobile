@@ -40,6 +40,7 @@ class _HomePageState extends State<HomePage> {
   bool _isNavigating = false;
   Timer? _navigationReleaseTimer;
   StreamSubscription<String>? _notificationResponseSub;
+  String? _pendingLaunchPayload;
 
   @override
   void initState() {
@@ -58,6 +59,15 @@ class _HomePageState extends State<HomePage> {
         _onNotificationPayloadReceived(payload);
       });
     });
+
+    // Trata o payload de notificação que abriu o app a partir do estado finalizado.
+    _pendingLaunchPayload = NotificationService.instance.popLaunchNotificationPayload();
+    if (_pendingLaunchPayload != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _processPendingLaunchPayload();
+      });
+    }
   }
 
   @override
@@ -96,6 +106,7 @@ class _HomePageState extends State<HomePage> {
 
     if (medIds.isEmpty) return;
 
+    _navigateToMedicationsPage();
     final appState = context.read<AppState>();
     final meds = appState.medications
         .where((m) => medIds.contains(m.id))
@@ -178,6 +189,44 @@ class _HomePageState extends State<HomePage> {
     await Future.wait(
       confirmedIds.map((id) => appState.decrementMedicationStock(id, by: 1)),
     );
+  }
+
+  Future<void> _processPendingLaunchPayload() async {
+    if (_pendingLaunchPayload == null) return;
+
+    const maxAttempts = 12;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!mounted) return;
+      final meds = context.read<AppState>().medications;
+      if (meds.isNotEmpty) {
+        _onNotificationPayloadReceived(_pendingLaunchPayload!);
+        _pendingLaunchPayload = null;
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // Tenta uma última vez antes de descartar.
+    if (!mounted) return;
+    if (context.read<AppState>().medications.isNotEmpty && _pendingLaunchPayload != null) {
+      _navigateToMedicationsPage();
+      _onNotificationPayloadReceived(_pendingLaunchPayload!);
+    }
+    _pendingLaunchPayload = null;
+  }
+
+  void _navigateToMedicationsPage() {
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(1);
+    }
+    if (_index != 1) {
+      setState(() {
+        _index = 1;
+        _currentPage = 1.0;
+        _canShowMedFab = true;
+        _canShowAppointmentFab = false;
+      });
+    }
   }
 
   String _extractDoseLabel(String dosage) {
