@@ -87,7 +87,6 @@ class _AppointmentCard extends StatelessWidget {
     final smallIconSize = iconSize * 0.75; // ~18 em escala normal
 
     final dateFormat = DateFormat('dd/MM/yyyy');
-    final timeFormat = DateFormat('HH:mm');
     final now = DateTime.now();
     final isPast = appointment.dateTime.isBefore(now);
     final isToday =
@@ -140,27 +139,7 @@ class _AppointmentCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            color: isToday
-                                ? Colors.orange
-                                : colorScheme.primary,
-                            size: smallIconSize,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            timeFormat.format(appointment.dateTime),
-                            style: textTheme.titleMedium?.copyWith(
-                              color: isToday
-                                  ? Colors.orange
-                                  : colorScheme.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
+                      
                     ],
                   ),
                 ),

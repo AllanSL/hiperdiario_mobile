@@ -23,9 +23,16 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   late TextEditingController _specialtyController;
   late TextEditingController _notesController;
   DateTime? _selectedDate;
-  TimeOfDay? _selectedTime;
 
   CnesEstabelecimento? _estabelecimenteSelecionado;
+
+  bool _isDateLoading = false;
+  bool _isDateBlocked = false;
+  bool _isDateFull = false;
+  bool _dateAvailabilityCalculated = false;
+  int? _dailyCapacity;
+  int _appointmentsCount = 0;
+  String? _dateAvailabilityLabel;
 
   // CNES
   List<CnesEstabelecimento> _todosEstabelecimentos = [];
@@ -50,7 +57,6 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   final _specialtyFocusNode = FocusNode();
   final _specialtyFieldKey = GlobalKey<FormFieldState>();
   final _dateFieldKey = GlobalKey<FormFieldState>();
-  final _timeFieldKey = GlobalKey<FormFieldState>();
   final _specialtyOverlayController = OverlayPortalController();
   ModalRoute<dynamic>? _modalRoute;
 
@@ -59,9 +65,6 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     super.initState();
     final appt = widget.appointment;
     _selectedDate = appt?.dateTime;
-    _selectedTime = appt != null
-        ? TimeOfDay(hour: appt.dateTime.hour, minute: appt.dateTime.minute)
-        : null;
     _locationController = TextEditingController(text: appt?.location ?? '');
     _specialtyController = TextEditingController(text: appt?.specialty ?? '');
     _notesController = TextEditingController(text: appt?.notes ?? '');
@@ -145,14 +148,22 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
             _estabelecimenteSelecionado = est;
             _carregarEspecialidades(est);
 
-            _carregarEspecialidades(est);
-
             if (_locationController.text.isEmpty) {
               _locationController.removeListener(_onLocationChanged);
               _locationController.text = est.nomeFantasia;
               _locationController.addListener(_onLocationChanged);
               _locationFixa = true;
             }
+            break;
+          }
+        }
+      } else if (widget.appointment != null &&
+          widget.appointment!.location.trim().isNotEmpty) {
+        final appointmentLocation = widget.appointment!.location.toLowerCase();
+        for (final est in resultado) {
+          if (est.nomeFantasia.toLowerCase() == appointmentLocation) {
+            _estabelecimenteSelecionado = est;
+            _carregarEspecialidades(est);
             break;
           }
         }
@@ -243,6 +254,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         _profissionaisFiltrados = profList;
         _especialidadesCarregando = false;
       });
+      if (_selectedDate != null && _specialtyController.text.trim().isNotEmpty) {
+        await _refreshDateAvailability();
+      }
     }
   }
 
@@ -251,7 +265,6 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       if (_selectedDate != null) {
         setState(() {
           _selectedDate = null;
-          _selectedTime = null;
         });
       }
     } else {
@@ -308,6 +321,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     );
     _fecharDropdownEspecialidade();
     FocusManager.instance.primaryFocus?.unfocus();
+    if (_selectedDate != null) {
+      _refreshDateAvailability();
+    }
   }
 
   (Offset, double) _calcularPosicaoDropdownEspecialidade() {
@@ -342,6 +358,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     );
     _fecharDropdown();
     FocusManager.instance.primaryFocus?.unfocus();
+    if (_selectedDate != null) {
+      _refreshDateAvailability();
+    }
   }
 
   /// Calcula posição e largura do dropdown com base no campo de texto.
@@ -359,13 +378,11 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     final now = DateTime.now();
     DateTime initial = _selectedDate ?? now;
 
-    // Garantir que a initialDate seja um dia válido (não sábado nem domingo)
     while (initial.weekday == DateTime.saturday ||
         initial.weekday == DateTime.sunday) {
       initial = initial.add(const Duration(days: 1));
     }
 
-    // Se a data já passou (por comparar com firstDate estrito), garante que pelo menos não seja antes do firstDate
     final first = DateTime(now.year, now.month, now.day);
     if (initial.isBefore(first)) {
       initial = first;
@@ -383,339 +400,289 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       selectableDayPredicate: (DateTime val) =>
           val.weekday != DateTime.saturday && val.weekday != DateTime.sunday,
     );
-    if (picked != null) {
-      if (_selectedDate != picked) {
-        setState(() {
-          _selectedDate = picked;
-          _selectedTime = null; // Reseta a hora ao trocar a data
-        });
-        // Remove erro de validação (se houvesse) quando ganha valor
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _dateFieldKey.currentState?.validate();
-        });
-      }
-    }
-  }
 
-  Future<void> _selectTime() async {
-    FocusManager.instance.primaryFocus?.unfocus();
-
-    if (_estabelecimenteSelecionado != null &&
-        _selectedDate != null &&
-        _estabelecimenteSelecionado!.ibgeOriginal != null) {
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
-
-      try {
-        final horarios = await CnesService.buscarHorariosAtendimento(
-          _estabelecimenteSelecionado!.ibgeOriginal!,
-          _estabelecimenteSelecionado!.codigoCnes,
-        );
-        if (mounted) Navigator.pop(context); // fecha loading
-
-        final dias = {
-          DateTime.monday: 'Segunda-Feira',
-          DateTime.tuesday: 'Terça-Feira',
-          DateTime.wednesday: 'Quarta-Feira',
-          DateTime.thursday: 'Quinta-Feira',
-          DateTime.friday: 'Sexta-Feira',
-          DateTime.saturday: 'Sábado',
-          DateTime.sunday: 'Domingo',
-        };
-        final diaSelecionado = dias[_selectedDate!.weekday];
-
-        final configDia = horarios.firstWhere(
-          (h) =>
-              (h['diaSemana'] as String?)?.toLowerCase() ==
-              diaSelecionado?.toLowerCase(),
-          orElse: () => null,
-        );
-
-        if (configDia != null) {
-          final startStrs = (configDia['hrInicioAtendimento'] as String).split(
-            ':',
-          );
-          final endStrs = (configDia['hrFimAtendimento'] as String).split(':');
-
-          final startHour = int.parse(startStrs[0]);
-          final startMin = int.parse(startStrs[1]);
-          final endHour = int.parse(endStrs[0]);
-          final endMin = int.parse(endStrs[1]);
-
-          // Busca horários já agendados globalmente no Supabase
-          final dataBusca = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-
-          final startOfDay = DateTime(
-            _selectedDate!.year,
-            _selectedDate!.month,
-            _selectedDate!.day,
-            0,
-            0,
-            0,
-          ).toUtc();
-          final endOfDay = DateTime(
-            _selectedDate!.year,
-            _selectedDate!.month,
-            _selectedDate!.day,
-            23,
-            59,
-            59,
-            999,
-          ).toUtc();
-
-          final String dataInicio = startOfDay.toIso8601String();
-          final String dataFim = endOfDay.toIso8601String();
-
-          Set<TimeOfDay> horariosOcupados = {};
-
-          try {
-            final specialtyText = _specialtyController.text;
-            final parts = specialtyText.split(' - ');
-            final profName = parts.length > 1 ? parts.last.trim() : specialtyText.trim();
-
-            // 1. Busco Agendamentos Normais (Pacientes)
-            final agendamentosDb = await Supabase.instance.client
-                .from('appointments')
-                .select('date_time')
-                .eq('location', _locationController.text)
-                .eq('specialty', specialtyText)
-                .gte('date_time', dataInicio)
-                .lte('date_time', dataFim);
-
-            // 2. Busco Bloqueios Manuais (Painel Web do Médico)
-            final bloqueiosDb = await Supabase.instance.client
-                .from('blocked_times')
-                .select('date_time')
-                .eq('location', _locationController.text)
-                .ilike('professional_name', '%$profName%')
-                .gte('date_time', dataInicio)
-                .lte('date_time', dataFim);
-
-            final allOcupados = [...agendamentosDb, ...bloqueiosDb];
-
-            horariosOcupados = allOcupados.map((e) {
-              final dt = DateTime.parse(e['date_time']).toLocal();
-              return TimeOfDay(hour: dt.hour, minute: dt.minute);
-            }).toSet();
-          } catch (e) {
-            debugPrint(
-              'Erro (não-fatal) ao buscar horários ocupados no Supabase: $e',
-            );
-          }
-
-          // Adiciona horários recém-criados localmente nesta sessão
-          if (mounted) {
-            final appState = context.read<AppState>();
-            final agendamentosLocais = appState.appointments
-                .where(
-                  (a) =>
-                      a.location == _locationController.text &&
-                      a.specialty == _specialtyController.text &&
-                      DateFormat('yyyy-MM-dd').format(a.dateTime) == dataBusca,
-                )
-                .map(
-                  (a) => TimeOfDay(
-                    hour: a.dateTime.hour,
-                    minute: a.dateTime.minute,
-                  ),
-                );
-            horariosOcupados.addAll(agendamentosLocais);
-          }
-
-          final slots = <TimeOfDay>[];
-          TimeOfDay current = TimeOfDay(hour: startHour, minute: startMin);
-          final endTime = TimeOfDay(hour: endHour, minute: endMin);
-
-          while (current.hour < endTime.hour ||
-              (current.hour == endTime.hour &&
-                  current.minute < endTime.minute)) {
-            slots.add(current);
-            int nextMin = current.minute + 30;
-            int nextHour = current.hour;
-            if (nextMin >= 60) {
-              nextMin -= 60;
-              nextHour += 1;
-            }
-            current = TimeOfDay(hour: nextHour, minute: nextMin);
-          }
-
-          if (slots.isEmpty) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Sem horários disponíveis na unidade neste dia.',
-                  ),
-                ),
-              );
-            }
-            return;
-          }
-
-          if (!mounted) return;
-          if (!mounted) return;
-          final selectedFromModal = await showModalBottomSheet<TimeOfDay>(
-            context: context,
-            builder: (context) {
-              return SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          'Horários em ',
-                          style: Theme.of(context).textTheme.titleMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const Divider(),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 250),
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 12,
-                                childAspectRatio: 2.5,
-                              ),
-                          itemCount: slots.length,
-                          itemBuilder: (context, index) {
-                            final slot = slots[index];
-                            final ocupado = horariosOcupados.contains(slot);
-                            return ActionChip(
-                              onPressed: ocupado
-                                  ? null
-                                  : () => Navigator.pop(context, slot),
-                              label: Text(
-                                ocupado ? 'Ocupado' : slot.format(context),
-                                style: TextStyle(
-                                  color: ocupado ? Colors.grey : null,
-                                  decoration: ocupado
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                              ),
-                              backgroundColor: ocupado
-                                  ? Colors.grey.shade200
-                                  : null,
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-
-          if (selectedFromModal != null) {
-            setState(() {
-              _selectedTime = selectedFromModal;
-            });
-          }
-          return;
-        } else {
-          if (mounted)
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Unidade fechada no dia selecionado.'),
-              ),
-            );
-          return;
-        }
-      } catch (e, st) {
-        debugPrint('Erro em _selectTime: $e\n$st');
-        if (mounted) {
-          Navigator.pop(context); // fecha loading
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Erro ao buscar horários da unidade.'),
-            ),
-          );
-        }
-      }
-    }
-
-    if (!mounted) return;
-
-    FocusScope.of(context).unfocus();
-    bool isTimePickerOpen = true;
-
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime ?? const TimeOfDay(hour: 0, minute: 0),
-      initialEntryMode: TimePickerEntryMode.input,
-      builder: (BuildContext context, Widget? child) {
-        return Listener(
-          onPointerUp: (_) {
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (!isTimePickerOpen) return;
-              final node = FocusManager.instance.primaryFocus;
-              if (node != null && node.context != null) {
-                EditableTextState? editable;
-                void findEditable(Element element) {
-                  if (editable != null) return;
-                  if (element is StatefulElement &&
-                      element.state is EditableTextState) {
-                    editable = element.state as EditableTextState;
-                  } else {
-                    element.visitChildren(findEditable);
-                  }
-                }
-
-                node.context!.visitChildElements(findEditable);
-                if (editable != null) {
-                  final text = editable!.textEditingValue.text;
-                  editable!.userUpdateTextEditingValue(
-                    editable!.textEditingValue.copyWith(
-                      selection: TextSelection.collapsed(offset: text.length),
-                    ),
-                    null,
-                  );
-                }
-              }
-            });
-          },
-          child: child,
-        );
-      },
-    );
-    isTimePickerOpen = false;
-
-    if (picked != null) {
+    if (picked != null && _selectedDate != picked) {
       setState(() {
-        _selectedTime = picked;
+        _selectedDate = picked;
+        _dateAvailabilityCalculated = false;
       });
-      // Remove erro de validação (se houvesse) quando ganha valor
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _timeFieldKey.currentState?.validate();
+        _dateFieldKey.currentState?.validate();
       });
+      await _refreshDateAvailability();
+      if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0) {
+        if (_isDateBlocked) {
+          _showToast('Atendimento suspenso. Escolha outra data.');
+        } else if (_isDateFull) {
+          _showToast('Atendimentos esgotados para esta data. Escolha outra data.');
+        } else {
+          _showToast('Data indisponível. Escolha outra data.');
+        }
+        setState(() {
+          _selectedDate = null;
+        });
+      }
     }
   }
 
-  void _save() {
+  Future<void> _refreshDateAvailability() async {
+    if (_selectedDate == null ||
+        _estabelecimenteSelecionado == null ||
+        _specialtyController.text.trim().isEmpty) {
+      setState(() {
+        _dateAvailabilityCalculated = false;
+        _isDateLoading = false;
+        _isDateBlocked = false;
+        _isDateFull = false;
+        _dailyCapacity = null;
+        _appointmentsCount = 0;
+        _dateAvailabilityLabel = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isDateLoading = true;
+      _dateAvailabilityCalculated = false;
+      _isDateBlocked = false;
+      _isDateFull = false;
+      _dailyCapacity = null;
+      _appointmentsCount = 0;
+      _dateAvailabilityLabel = null;
+    });
+
+    final date = _selectedDate!;
+    if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+      setState(() {
+        _isDateLoading = false;
+        _isDateBlocked = true;
+        _dailyCapacity = 0;
+        _appointmentsCount = 0;
+        _dateAvailabilityCalculated = true;
+        _dateAvailabilityLabel = 'Dia indisponível';
+      });
+      return;
+    }
+
+    final patient = context.read<AppState>().patient;
+    final codigoUf = patient?.codigoUf;
+    final codigoMunicipio = patient?.codigoMunicipio;
+    final ibge = _estabelecimenteSelecionado!.ibgeOriginal ??
+        ((codigoUf != null && codigoMunicipio != null)
+            ? codigoUf * 100000 + codigoMunicipio
+            : null);
+
+    if (ibge == null) {
+      setState(() {
+        _isDateLoading = false;
+        _isDateBlocked = true;
+        _dailyCapacity = 0;
+        _appointmentsCount = 0;
+        _dateAvailabilityCalculated = true;
+        _dateAvailabilityLabel = 'Não foi possível calcular a capacidade da UBS';
+      });
+      return;
+    }
+
+    final horarios = await CnesService.buscarHorariosAtendimento(
+      ibge,
+      _estabelecimenteSelecionado!.codigoCnes,
+    );
+
+    if (horarios.isEmpty) {
+      setState(() {
+        _isDateLoading = false;
+        _isDateBlocked = true;
+        _dailyCapacity = 0;
+        _appointmentsCount = 0;
+        _dateAvailabilityCalculated = true;
+        _dateAvailabilityLabel = 'Não foi possível obter a jornada da UBS';
+      });
+      return;
+    }
+
+    final dias = {
+      DateTime.monday: 'Segunda-Feira',
+      DateTime.tuesday: 'Terça-Feira',
+      DateTime.wednesday: 'Quarta-Feira',
+      DateTime.thursday: 'Quinta-Feira',
+      DateTime.friday: 'Sexta-Feira',
+      DateTime.saturday: 'Sábado',
+      DateTime.sunday: 'Domingo',
+    };
+
+    final diaSelecionado = dias[date.weekday];
+    final configDia = horarios.firstWhere(
+      (h) =>
+          (h['diaSemana'] as String?)?.toLowerCase() ==
+          diaSelecionado?.toLowerCase(),
+      orElse: () => null,
+    );
+
+    if (configDia == null) {
+      setState(() {
+        _isDateLoading = false;
+        _isDateBlocked = true;
+        _dailyCapacity = 0;
+        _appointmentsCount = 0;
+        _dateAvailabilityCalculated = true;
+        _dateAvailabilityLabel = 'Dia indisponível';
+      });
+      return;
+    }
+
+    final startStrs = (configDia['hrInicioAtendimento'] as String).split(':');
+    final endStrs = (configDia['hrFimAtendimento'] as String).split(':');
+    final startHour = int.tryParse(startStrs[0]) ?? 0;
+    final startMin = int.tryParse(startStrs[1]) ?? 0;
+    final endHour = int.tryParse(endStrs[0]) ?? 0;
+    final endMin = int.tryParse(endStrs[1]) ?? 0;
+
+    final capacity = _calculateDailyCapacity(startHour, startMin, endHour, endMin);
+    if (capacity <= 0) {
+      setState(() {
+        _isDateLoading = false;
+        _isDateBlocked = true;
+        _dailyCapacity = 0;
+        _appointmentsCount = 0;
+        _dateAvailabilityCalculated = true;
+        _dateAvailabilityLabel = 'Atendimento suspenso';
+      });
+      return;
+    }
+
+    final startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0).toUtc();
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999).toUtc();
+    final dataInicio = startOfDay.toIso8601String();
+    final dataFim = endOfDay.toIso8601String();
+
+    int count = 0;
+    try {
+      final appointmentsResp = await Supabase.instance.client
+          .from('appointments')
+          .select('id')
+          .eq('location', _locationController.text.trim())
+          .eq('specialty', _specialtyController.text.trim())
+          .gte('date_time', dataInicio)
+          .lte('date_time', dataFim);
+      count = appointmentsResp.length;
+      if (widget.appointment != null) {
+        final existsSameId = appointmentsResp.any((item) =>
+            item['id'] == widget.appointment!.id);
+        if (existsSameId) count = count - 1;
+      }
+        } catch (_) {}
+
+    bool blocked = false;
+    try {
+      final blockedResp = await Supabase.instance.client
+          .from('blocked_times')
+          .select('date_time')
+          .eq('location', _locationController.text.trim())
+          .gte('date_time', dataInicio)
+          .lte('date_time', dataFim)
+          .limit(1);
+      if (blockedResp.isNotEmpty) {
+        blocked = true;
+      }
+    } catch (_) {}
+
+    final isFull = count >= capacity;
+    setState(() {
+      _isDateLoading = false;
+      _isDateBlocked = blocked;
+      _isDateFull = isFull;
+      _dailyCapacity = capacity;
+      _appointmentsCount = count;
+      _dateAvailabilityCalculated = true;
+      if (blocked) {
+        _dateAvailabilityLabel = 'Dia indisponível';
+      } else if (isFull) {
+        _dateAvailabilityLabel = 'Lotado';
+      } else {
+        _dateAvailabilityLabel =
+            'Data escolhida: ${DateFormat('dd/MM/yyyy').format(date)} — $_appointmentsCount/$_dailyCapacity vagas ocupadas';
+      }
+    });
+  }
+
+  int _calculateDailyCapacity(
+    int startHour,
+    int startMinute,
+    int endHour,
+    int endMinute,
+  ) {
+    final start = Duration(hours: startHour, minutes: startMinute);
+    final end = Duration(hours: endHour, minutes: endMinute);
+    final totalMinutes = end.inMinutes - start.inMinutes;
+    if (totalMinutes <= 0) return 0;
+    return (totalMinutes / 30).floor();
+  }
+
+  bool get _canSaveAppointment {
+    if (_selectedDate == null) return false;
+    if (_isDateLoading) return false;
+    if (!_dateAvailabilityCalculated) return false;
+    if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0) return false;
+    return true;
+  }
+
+  void _showDateAvailabilityError() {
+    if (_isDateBlocked) {
+      _showToast('Dia indisponível / atendimento suspenso. Escolha outra data.');
+    } else if (_isDateFull) {
+      _showToast('Atendimentos esgotados para esta data. Escolha outra data.');
+    } else if ((_dailyCapacity ?? 0) == 0) {
+      _showToast('Capacidade da UBS zerada para esta data.');
+    }
+  }
+
+  void _showToast(String message) {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        backgroundColor: theme.colorScheme.error,
+        duration: const Duration(seconds: 2),
+        content: Row(
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: theme.colorScheme.onError,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: theme.colorScheme.onError),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_dateAvailabilityCalculated) {
+      await _refreshDateAvailability();
+    }
+    if (_isDateLoading) return;
+    if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0) {
+      _showDateAvailabilityError();
+      return;
+    }
 
     final dateTime = DateTime(
       _selectedDate!.year,
       _selectedDate!.month,
       _selectedDate!.day,
-      _selectedTime!.hour,
-      _selectedTime!.minute,
     );
 
     final appointment = Appointment(
@@ -958,7 +925,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                   padding: EdgeInsets.zero,
                                   shrinkWrap: true,
                                   itemCount: _profissionaisFiltrados.length,
-                                  separatorBuilder: (_, __) => Divider(
+                                  separatorBuilder: (_, _) => Divider(
                                     height: 1,
                                     color: colorScheme.outlineVariant,
                                   ),
@@ -1112,43 +1079,24 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Hora
-                GestureDetector(
-                  onTap: hasDate
-                      ? _selectTime
-                      : () {
-                          _dateFieldKey.currentState?.validate();
-                        },
-                  child: AbsorbPointer(
-                    child: TextFormField(
-                      key: _timeFieldKey,
-                      readOnly: true,
-                      enabled: hasDate,
-                      decoration: AppInputDecoration.build(
-                        context,
-                        labelText: 'Horário',
-                        hintText: hasDate
-                            ? 'Selecione um horário'
-                            : 'Escolha uma data primeiro',
-                        prefixIcon: Icon(
-                          Icons.access_time,
-                          color: hasDate
-                              ? colorScheme.primary
-                              : colorScheme.onSurface.withOpacity(0.38),
+                if (_isDateLoading)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 0, 16),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.primary,
+                          ),
                         ),
-                      ),
-                      controller: TextEditingController(
-                        text: _selectedTime == null
-                            ? ''
-                            : _selectedTime!.format(context),
-                      ),
-                      validator: (_) =>
-                          _selectedTime == null ? 'Selecione um horário' : null,
+                        const SizedBox(width: 8),
+                        const Text('Verificando disponibilidade...'),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
 
                 // Observações
                 TextFormField(
@@ -1180,7 +1128,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Você receberá lembretes 1 dia antes e 1 hora antes da consulta.',
+                          'Atendimento por ordem de chegada. Chegue no dia marcado na UBS.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: colorScheme.onSecondaryContainer,
@@ -1194,7 +1142,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
 
                 // Botão Salvar
                 FilledButton.icon(
-                  onPressed: _save,
+                  onPressed: _canSaveAppointment ? _save : null,
                   icon: const Icon(Icons.check),
                   label: Text(
                     isEditing ? 'Salvar Alterações' : 'Agendar Consulta',
@@ -1304,7 +1252,7 @@ class _DropdownCnes extends StatelessWidget {
         padding: EdgeInsets.zero,
         shrinkWrap: true,
         itemCount: sugestoes.length,
-        separatorBuilder: (_, __) =>
+        separatorBuilder: (_, _) =>
             Divider(height: 1, color: colorScheme.outlineVariant),
         itemBuilder: (context, index) {
           final est = sugestoes[index];
