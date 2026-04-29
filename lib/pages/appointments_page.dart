@@ -93,7 +93,6 @@ class _AppointmentCard extends StatelessWidget {
 
     final dateFormat = DateFormat('dd/MM/yyyy');
     final now = DateTime.now();
-    final isPast = appointment.dateTime.isBefore(now);
     final isToday =
         appointment.dateTime.year == now.year &&
         appointment.dateTime.month == now.month &&
@@ -328,119 +327,6 @@ class _AppointmentCard extends StatelessWidget {
               ),
             ],
 
-            // Botões de comparecimento (se a consulta já passou e ainda não foi marcada)
-            if (isPast && appointment.attended == null) ...[
-              const Divider(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        context.read<AppState>().markAppointmentAttendance(
-                          appointment.id,
-                          false,
-                        );
-                        ScaffoldMessenger.of(rootContext).showSnackBar(
-                          SnackBar(
-                            behavior: SnackBarBehavior.floating,
-                            margin: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            backgroundColor: Theme.of(
-                              rootContext,
-                            ).colorScheme.error,
-                            duration: const Duration(seconds: 2),
-                            content: Row(
-                              children: [
-                                Icon(
-                                  Icons.cancel_outlined,
-                                  color: Theme.of(
-                                    rootContext,
-                                  ).colorScheme.onError,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Marcado como: Não compareceu',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        rootContext,
-                                      ).colorScheme.onError,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.close, size: smallIconSize),
-                      label: const Text('Faltou'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        context.read<AppState>().markAppointmentAttendance(
-                          appointment.id,
-                          true,
-                        );
-                        ScaffoldMessenger.of(rootContext).showSnackBar(
-                          SnackBar(
-                            behavior: SnackBarBehavior.floating,
-                            margin: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            backgroundColor: Theme.of(
-                              rootContext,
-                            ).colorScheme.primaryContainer,
-                            duration: const Duration(seconds: 2),
-                            content: Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle_outline,
-                                  color: Theme.of(
-                                    rootContext,
-                                  ).colorScheme.onPrimaryContainer,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Marcado como: Compareceu ✓',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        rootContext,
-                                      ).colorScheme.onPrimaryContainer,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.check, size: smallIconSize),
-                      label: const Text('Compareceu'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            // Status de comparecimento
             if (appointment.attended != null) ...[
               const Divider(height: 24),
               Container(
