@@ -473,25 +473,34 @@ class AppState extends ChangeNotifier {
       } catch (_) {}
     }
 
-    String? ubsName;
+    String? ubsName = profile?['ubs_name']?.toString().trim();
     final ubsCnes = profile?['ubs_cnes']?.toString();
-    if (ubsCnes != null &&
-        ubsCnes.trim().isNotEmpty &&
-        codigoUf != null &&
-        codigoMunicipio != null) {
+    if ((ubsName == null || ubsName.isEmpty) &&
+        ubsCnes != null &&
+        ubsCnes.trim().isNotEmpty) {
       try {
-        final ubsList = await CnesService.buscarEstabelecimentos(
-          codigoUf: codigoUf,
-          codigoMunicipio: codigoMunicipio,
-          tipoUnidade: 2,
-        );
-        final match = ubsList
-            .where((u) => u.codigoCnes.toString() == ubsCnes)
-            .firstOrNull;
-        if (match != null) {
-          ubsName = match.nomeFantasia;
-        }
-      } catch (_) {}
+        ubsName = await _resolveUbsNameFromLocalCnes(ubsCnes.trim());
+      } catch (_) {
+        // Se a consulta local falhar, tentamos buscar via CNES externo.
+      }
+
+      if ((ubsName == null || ubsName.isEmpty) &&
+          codigoUf != null &&
+          codigoMunicipio != null) {
+        try {
+          final ubsList = await CnesService.buscarEstabelecimentos(
+            codigoUf: codigoUf,
+            codigoMunicipio: codigoMunicipio,
+            tipoUnidade: 2,
+          );
+          final match = ubsList
+              .where((u) => u.codigoCnes.toString() == ubsCnes)
+              .firstOrNull;
+          if (match != null) {
+            ubsName = match.nomeFantasia;
+          }
+        } catch (_) {}
+      }
     }
 
     _patient = _mapPatientFromDb(
@@ -774,7 +783,7 @@ class AppState extends ChangeNotifier {
       ubs: row?['ubs_cnes']?.toString().isNotEmpty == true
           ? row!['ubs_cnes'].toString()
           : 'UBS n�o informada',
-      ubsName: ubsName,
+      ubsName: ubsName ?? row?['ubs_name']?.toString(),
       email: (row?['email'] ?? email)?.toString(),
       emergencyContact: emergencyContact,
       codigoUf: _resolveCodigoUf(row?['uf']?.toString()),
@@ -784,6 +793,24 @@ class AppState extends ChangeNotifier {
           : int.tryParse('${municipio ?? ''}'),
       nomeMunicipio: nomeMunicipio,
     );
+  }
+
+  Future<String?> _resolveUbsNameFromLocalCnes(String ubsCnes) async {
+    try {
+      final result = await _supabase
+          .from('cnes_establishments')
+          .select('name')
+          .eq('cnes_id', ubsCnes)
+          .maybeSingle();
+
+      if (result is Map<String, dynamic>) {
+        final name = result['name']?.toString().trim();
+        return (name?.isNotEmpty == true) ? name : null;
+      }
+    } catch (_) {
+      // Ignora erro e permite fallback para a rota externa.
+    }
+    return null;
   }
 
   Appointment _mapAppointmentFromDb(Map<String, dynamic> row) {
@@ -1105,7 +1132,12 @@ class AppState extends ChangeNotifier {
     // Preparar os dados para atualiza��o no Supabase
     final payload = <String, dynamic>{};
     if (contact != null) payload['phone'] = contact;
-    if (ubs != null) payload['ubs_cnes'] = ubs;
+    if (ubs != null) {
+      payload['ubs_cnes'] = ubs;
+      if (ubsName != null) payload['ubs_name'] = ubsName;
+    } else if (ubsName != null) {
+      payload['ubs_name'] = ubsName;
+    }
     if (email != null) payload['email'] = email;
 
     if (clearEmergencyContact) {
