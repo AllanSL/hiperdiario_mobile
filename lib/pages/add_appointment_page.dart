@@ -579,6 +579,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           .from('blocked_times')
           .select('date_time')
           .eq('location', _locationController.text.trim())
+          .eq('specialty', _specialtyController.text.trim())
           .gte('date_time', dataInicio)
           .lte('date_time', dataFim)
           .limit(1);

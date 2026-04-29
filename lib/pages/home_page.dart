@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
-import '../core/models/medication.dart';
 import '../core/services/notification_service.dart';
 
 import '../state/app_state.dart';
@@ -83,12 +82,10 @@ class _HomePageState extends State<HomePage> {
 
   void _onNotificationPayloadReceived(String payload) async {
     final medIds = <String>{};
-    String? scheduledTime;
 
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
       if (data['type'] == 'med_reminder') {
-        scheduledTime = data['scheduledTime']?.toString();
         if (data['medIds'] is List) {
           for (final item in data['medIds'] as List) {
             if (item != null) medIds.add(item.toString());
@@ -364,10 +361,80 @@ class _HomePageState extends State<HomePage> {
                 tooltip: 'Atualizar medicamentos da UBS',
                 onPressed: () async {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       behavior: SnackBarBehavior.floating,
-                      duration: Duration(seconds: 2),
-                      content: Text('Buscando atualizações na UBS'),
+                      margin: const EdgeInsets.all(16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
+                      duration: const Duration(seconds: 2),
+                      content: Row(
+                        children: [
+                          Icon(
+                            Icons.sync,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Buscando atualizações na UBS',
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  await context.read<AppState>().syncUbsData();
+                },
+                icon: const Icon(Icons.sync),
+              ),
+            ),
+          if (_canShowAppointmentFab)
+            Tooltip(
+              message: 'Atualizar consultas',
+              child: IconButton(
+                tooltip: 'Atualizar consultas',
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.all(16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
+                      duration: const Duration(seconds: 2),
+                      content: Row(
+                        children: [
+                          Icon(
+                            Icons.sync,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Buscando atualizações na UBS',
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                   await context.read<AppState>().syncUbsData();

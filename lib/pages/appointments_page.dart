@@ -14,13 +14,17 @@ class AppointmentsPage extends StatelessWidget {
     final allAppointments = context.watch<AppState>().appointments;
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
-    final iconSize = theme.iconTheme.size ?? 24;
 
     // Filtrar apenas consultas futuras
     final now = DateTime.now();
-    final upcomingAppointments =
-        allAppointments.where((appt) => appt.dateTime.isAfter(now)).toList()
-          ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    final upcomingAppointments = allAppointments.where((appt) {
+      final date = appt.dateTime;
+      return date.isAfter(now) ||
+          (date.year == now.year &&
+              date.month == now.month &&
+              date.day == now.day);
+    }).toList()
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
     if (upcomingAppointments.isEmpty) {
       return Center(
@@ -28,6 +32,7 @@ class AppointmentsPage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.event_available,
