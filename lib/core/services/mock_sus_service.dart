@@ -32,6 +32,7 @@ class MockSusService {
         dateTime: now.add(const Duration(days: 2, hours: 3)),
         location: 'UBS José Ronaldo',
         specialty: 'Cardiologia',
+        shift: AppointmentShift.morning,
         notes: 'Levar exames de sangue',
       ),
       Appointment(
@@ -39,6 +40,7 @@ class MockSusService {
         dateTime: now.add(const Duration(days: 10, hours: 1)),
         location: 'UBS José Ronaldo',
         specialty: 'Endocrinologia',
+        shift: AppointmentShift.afternoon,
       ),
     ];
   }

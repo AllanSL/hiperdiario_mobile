@@ -23,6 +23,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   late TextEditingController _specialtyController;
   late TextEditingController _notesController;
   DateTime? _selectedDate;
+  AppointmentShift _selectedShift = AppointmentShift.morning;
 
   CnesEstabelecimento? _estabelecimenteSelecionado;
 
@@ -65,6 +66,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     super.initState();
     final appt = widget.appointment;
     _selectedDate = appt?.dateTime;
+    _selectedShift = appt?.shift ?? AppointmentShift.morning;
     _locationController = TextEditingController(text: appt?.location ?? '');
     _specialtyController = TextEditingController(text: appt?.specialty ?? '');
     _notesController = TextEditingController(text: appt?.notes ?? '');
@@ -293,11 +295,32 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
 
   void _onSpecialtyTap() {
     if (!_dropdownEspecAberto) {
+      // Ao abrir sem digitação, mostra lista completa para facilitar troca.
+      if (!_especModoDigitacao) {
+        setState(() {
+          _profissionaisFiltrados = _todosProfissionais;
+        });
+      }
       _abrirDropdownEspecialidade();
     } else if (!_especModoDigitacao) {
       setState(() => _especModoDigitacao = true);
       _specialtyFocusNode.requestFocus();
     }
+  }
+
+  void _clearSpecialty() {
+    _specialtyController.clear();
+    setState(() {
+      _dateAvailabilityCalculated = false;
+      _dateAvailabilityLabel = null;
+      _isDateBlocked = false;
+      _isDateFull = false;
+      _dailyCapacity = null;
+      _appointmentsCount = 0;
+      _selectedShift = AppointmentShift.morning;
+    });
+    _specialtyFocusNode.requestFocus();
+    _abrirDropdownEspecialidade();
   }
 
   void _abrirDropdownEspecialidade() {
@@ -404,6 +427,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     if (picked != null && _selectedDate != picked) {
       setState(() {
         _selectedDate = picked;
+        _selectedShift = AppointmentShift.morning;
         _dateAvailabilityCalculated = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -414,13 +438,10 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         if (_isDateBlocked) {
           _showToast('Atendimento suspenso. Escolha outra data.');
         } else if (_isDateFull) {
-          _showToast('Atendimentos esgotados para esta data. Escolha outra data.');
+          _showToast('Manhã lotada para esta data. Tente o turno da tarde.');
         } else {
-          _showToast('Data indisponível. Escolha outra data.');
+          _showToast('Sem vagas para este turno. Tente trocar o turno.');
         }
-        setState(() {
-          _selectedDate = null;
-        });
       }
     }
   }
@@ -464,93 +485,6 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       return;
     }
 
-    final patient = context.read<AppState>().patient;
-    final codigoUf = patient?.codigoUf;
-    final codigoMunicipio = patient?.codigoMunicipio;
-    final ibge = _estabelecimenteSelecionado!.ibgeOriginal ??
-        ((codigoUf != null && codigoMunicipio != null)
-            ? codigoUf * 100000 + codigoMunicipio
-            : null);
-
-    if (ibge == null) {
-      setState(() {
-        _isDateLoading = false;
-        _isDateBlocked = true;
-        _dailyCapacity = 0;
-        _appointmentsCount = 0;
-        _dateAvailabilityCalculated = true;
-        _dateAvailabilityLabel = 'Não foi possível calcular a capacidade da UBS';
-      });
-      return;
-    }
-
-    final horarios = await CnesService.buscarHorariosAtendimento(
-      ibge,
-      _estabelecimenteSelecionado!.codigoCnes,
-    );
-
-    if (horarios.isEmpty) {
-      setState(() {
-        _isDateLoading = false;
-        _isDateBlocked = true;
-        _dailyCapacity = 0;
-        _appointmentsCount = 0;
-        _dateAvailabilityCalculated = true;
-        _dateAvailabilityLabel = 'Não foi possível obter a jornada da UBS';
-      });
-      return;
-    }
-
-    final dias = {
-      DateTime.monday: 'Segunda-Feira',
-      DateTime.tuesday: 'Terça-Feira',
-      DateTime.wednesday: 'Quarta-Feira',
-      DateTime.thursday: 'Quinta-Feira',
-      DateTime.friday: 'Sexta-Feira',
-      DateTime.saturday: 'Sábado',
-      DateTime.sunday: 'Domingo',
-    };
-
-    final diaSelecionado = dias[date.weekday];
-    final configDia = horarios.firstWhere(
-      (h) =>
-          (h['diaSemana'] as String?)?.toLowerCase() ==
-          diaSelecionado?.toLowerCase(),
-      orElse: () => null,
-    );
-
-    if (configDia == null) {
-      setState(() {
-        _isDateLoading = false;
-        _isDateBlocked = true;
-        _dailyCapacity = 0;
-        _appointmentsCount = 0;
-        _dateAvailabilityCalculated = true;
-        _dateAvailabilityLabel = 'Dia indisponível';
-      });
-      return;
-    }
-
-    final startStrs = (configDia['hrInicioAtendimento'] as String).split(':');
-    final endStrs = (configDia['hrFimAtendimento'] as String).split(':');
-    final startHour = int.tryParse(startStrs[0]) ?? 0;
-    final startMin = int.tryParse(startStrs[1]) ?? 0;
-    final endHour = int.tryParse(endStrs[0]) ?? 0;
-    final endMin = int.tryParse(endStrs[1]) ?? 0;
-
-    final capacity = _calculateDailyCapacity(startHour, startMin, endHour, endMin);
-    if (capacity <= 0) {
-      setState(() {
-        _isDateLoading = false;
-        _isDateBlocked = true;
-        _dailyCapacity = 0;
-        _appointmentsCount = 0;
-        _dateAvailabilityCalculated = true;
-        _dateAvailabilityLabel = 'Atendimento suspenso';
-      });
-      return;
-    }
-
     final startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0).toUtc();
     final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999).toUtc();
     final dataInicio = startOfDay.toIso8601String();
@@ -563,6 +497,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           .select('id')
           .eq('location', _locationController.text.trim())
           .eq('specialty', _specialtyController.text.trim())
+          .eq('shift', _selectedShift.dbValue)
           .gte('date_time', dataInicio)
           .lte('date_time', dataFim);
       count = appointmentsResp.length;
@@ -571,7 +506,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
             item['id'] == widget.appointment!.id);
         if (existsSameId) count = count - 1;
       }
-        } catch (_) {}
+    } catch (_) {}
 
     bool blocked = false;
     try {
@@ -588,6 +523,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       }
     } catch (_) {}
 
+    const capacity = 5;
     final isFull = count >= capacity;
     setState(() {
       _isDateLoading = false;
@@ -599,25 +535,12 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       if (blocked) {
         _dateAvailabilityLabel = 'Dia indisponível';
       } else if (isFull) {
-        _dateAvailabilityLabel = 'Lotado';
+        _dateAvailabilityLabel = '${_selectedShift.label}: lotado';
       } else {
         _dateAvailabilityLabel =
-            'Data escolhida: ${DateFormat('dd/MM/yyyy').format(date)} — $_appointmentsCount/$_dailyCapacity vagas ocupadas';
+            '${_selectedShift.label}: $_appointmentsCount/$_dailyCapacity vagas ocupadas';
       }
     });
-  }
-
-  int _calculateDailyCapacity(
-    int startHour,
-    int startMinute,
-    int endHour,
-    int endMinute,
-  ) {
-    final start = Duration(hours: startHour, minutes: startMinute);
-    final end = Duration(hours: endHour, minutes: endMinute);
-    final totalMinutes = end.inMinutes - start.inMinutes;
-    if (totalMinutes <= 0) return 0;
-    return (totalMinutes / 30).floor();
   }
 
   bool get _canSaveAppointment {
@@ -632,9 +555,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     if (_isDateBlocked) {
       _showToast('Dia indisponível / atendimento suspenso. Escolha outra data.');
     } else if (_isDateFull) {
-      _showToast('Atendimentos esgotados para esta data. Escolha outra data.');
+      _showToast('Limite do turno atingido. Escolha outra data ou turno.');
     } else if ((_dailyCapacity ?? 0) == 0) {
-      _showToast('Capacidade da UBS zerada para esta data.');
+      _showToast('Sem vagas disponíveis para este turno.');
     }
   }
 
@@ -696,6 +619,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
+      shift: _selectedShift,
       attended: widget.appointment?.attended,
     );
 
@@ -725,7 +649,6 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
 
     final hasLocation = _locationController.text.trim().isNotEmpty;
     final hasSpecialty = _specialtyController.text.trim().isNotEmpty;
-    final hasDate = _selectedDate != null;
 
     return GestureDetector(
       onTap: () {
@@ -1016,21 +939,26 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                   ),
                                 )
                               : (_todosProfissionais.isNotEmpty && hasLocation
-                                    ? IconButton(
-                                        icon: Icon(
-                                          _dropdownEspecAberto
-                                              ? Icons.keyboard_arrow_up
-                                              : Icons.keyboard_arrow_down,
-                                          color: colorScheme.outline,
-                                        ),
-                                        onPressed: () {
-                                          if (_dropdownEspecAberto) {
-                                            _fecharDropdownEspecialidade();
-                                          } else {
-                                            _onSpecialtyTap();
-                                          }
-                                        },
-                                      )
+                                    ? (_specialtyController.text.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(Icons.clear),
+                                              onPressed: _clearSpecialty,
+                                            )
+                                          : IconButton(
+                                              icon: Icon(
+                                                _dropdownEspecAberto
+                                                    ? Icons.keyboard_arrow_up
+                                                    : Icons.keyboard_arrow_down,
+                                                color: colorScheme.outline,
+                                              ),
+                                              onPressed: () {
+                                                if (_dropdownEspecAberto) {
+                                                  _fecharDropdownEspecialidade();
+                                                } else {
+                                                  _onSpecialtyTap();
+                                                }
+                                              },
+                                            ))
                                     : null),
                         ),
                         validator: (v) => v == null || v.trim().isEmpty
@@ -1080,6 +1008,57 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // Turno (bloqueado até selecionar a data)
+                Opacity(
+                  opacity: _selectedDate == null ? 0.6 : 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Turno',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      SegmentedButton<AppointmentShift>(
+                        segments: const [
+                          ButtonSegment<AppointmentShift>(
+                            value: AppointmentShift.morning,
+                            label: Text('Manhã'),
+                          ),
+                          ButtonSegment<AppointmentShift>(
+                            value: AppointmentShift.afternoon,
+                            label: Text('Tarde'),
+                          ),
+                        ],
+                        selected: {_selectedShift},
+                        onSelectionChanged: _selectedDate == null
+                            ? null
+                            : (selected) {
+                                final next = selected.first;
+                                if (next == _selectedShift) return;
+                                setState(() {
+                                  _selectedShift = next;
+                                  _dateAvailabilityCalculated = false;
+                                });
+                                _refreshDateAvailability();
+                              },
+                      ),
+                      if (_selectedDate == null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Selecione a data para liberar o turno.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
                 if (_isDateLoading)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(10, 0, 0, 16),
@@ -1098,6 +1077,19 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                       ],
                     ),
                   ),
+                if (_dateAvailabilityCalculated &&
+                    _dateAvailabilityLabel != null) ...[
+                  Text(
+                    _dateAvailabilityLabel!,
+                    style: TextStyle(
+                      color: _isDateBlocked || _isDateFull
+                          ? colorScheme.error
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // Observações
                 TextFormField(
@@ -1129,7 +1121,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Atendimento por ordem de chegada. Chegue no dia marcado na UBS.',
+                          'Limite de 5 consultas por turno. Atendimento por ordem de chegada na UBS.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: colorScheme.onSecondaryContainer,

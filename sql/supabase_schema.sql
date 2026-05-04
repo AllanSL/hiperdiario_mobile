@@ -63,7 +63,9 @@ create table if not exists appointments (
   remote_id text,
   patient_id bigint references users(id),
   date_time timestamptz not null,
+  location text,
   specialty text,
+  shift text not null default 'morning',
   notes text,
   establishment_id bigint,
   is_synced boolean default false,
@@ -71,6 +73,8 @@ create table if not exists appointments (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+alter table if exists appointments
+  add column if not exists shift text not null default 'morning';
 create index if not exists idx_appointments_date on appointments (date_time);
 
 -- Tabela de CNES (estabelecimentos)

@@ -1,8 +1,36 @@
+enum AppointmentShift { morning, afternoon }
+
+extension AppointmentShiftX on AppointmentShift {
+  String get dbValue => switch (this) {
+    AppointmentShift.morning => 'morning',
+    AppointmentShift.afternoon => 'afternoon',
+  };
+
+  String get label => switch (this) {
+    AppointmentShift.morning => 'Manhã',
+    AppointmentShift.afternoon => 'Tarde',
+  };
+
+  static AppointmentShift fromDb(String? value) {
+    switch ((value ?? '').toLowerCase()) {
+      case 'afternoon':
+      case 'tarde':
+        return AppointmentShift.afternoon;
+      case 'morning':
+      case 'manha':
+      case 'manhã':
+      default:
+        return AppointmentShift.morning;
+    }
+  }
+}
+
 class Appointment {
   final String id;
   final DateTime dateTime;
   final String location;
   final String specialty; // Especialidade (ex: Cardiologia, Clínico Geral)
+  final AppointmentShift shift;
   final String? notes; // Observações opcionais
   final bool? attended; // null: não ocorreu ainda, true: compareceu, false: faltou
 
@@ -11,6 +39,7 @@ class Appointment {
     required this.dateTime,
     required this.location,
     required this.specialty,
+    this.shift = AppointmentShift.morning,
     this.notes,
     this.attended,
   });
@@ -20,6 +49,7 @@ class Appointment {
     DateTime? dateTime,
     String? location,
     String? specialty,
+    AppointmentShift? shift,
     String? notes,
     bool? attended,
   }) {
@@ -28,6 +58,7 @@ class Appointment {
       dateTime: dateTime ?? this.dateTime,
       location: location ?? this.location,
       specialty: specialty ?? this.specialty,
+      shift: shift ?? this.shift,
       notes: notes ?? this.notes,
       attended: attended ?? this.attended,
     );

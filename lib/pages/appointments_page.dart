@@ -24,7 +24,11 @@ class AppointmentsPage extends StatelessWidget {
               date.month == now.month &&
               date.day == now.day);
     }).toList()
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      ..sort((a, b) {
+        final dateCmp = a.dateTime.compareTo(b.dateTime);
+        if (dateCmp != 0) return dateCmp;
+        return _shiftOrder(a.shift).compareTo(_shiftOrder(b.shift));
+      });
 
     if (upcomingAppointments.isEmpty) {
       return Center(
@@ -118,9 +122,8 @@ class _AppointmentCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Wrap(
-                    spacing: 16,
-                    runSpacing: 8,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -143,7 +146,11 @@ class _AppointmentCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      
+                      const SizedBox(height: 8),
+                      Chip(
+                        visualDensity: VisualDensity.compact,
+                        label: Text('Turno: ${appointment.shift.label}'),
+                      ),
                     ],
                   ),
                 ),
@@ -424,4 +431,11 @@ class _AppointmentCard extends StatelessWidget {
       ),
     );
   }
+}
+
+int _shiftOrder(AppointmentShift shift) {
+  return switch (shift) {
+    AppointmentShift.morning => 0,
+    AppointmentShift.afternoon => 1,
+  };
 }

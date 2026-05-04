@@ -5,6 +5,13 @@ import 'package:provider/provider.dart';
 import '../core/models/appointment.dart';
 import '../state/app_state.dart';
 
+int _shiftOrder(AppointmentShift shift) {
+  return switch (shift) {
+    AppointmentShift.morning => 0,
+    AppointmentShift.afternoon => 1,
+  };
+}
+
 class AppointmentHistoryPage extends StatelessWidget {
   const AppointmentHistoryPage({super.key});
 
@@ -14,10 +21,15 @@ class AppointmentHistoryPage extends StatelessWidget {
 
     // Filtrar apenas consultas passadas
     final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
     final pastAppointments =
-        allAppointments.where((appt) => appt.dateTime.isBefore(now)).toList()
+        allAppointments.where((appt) => appt.dateTime.isBefore(startOfToday)).toList()
           ..sort(
-            (a, b) => b.dateTime.compareTo(a.dateTime),
+            (a, b) {
+              final dateCmp = b.dateTime.compareTo(a.dateTime);
+              if (dateCmp != 0) return dateCmp;
+              return _shiftOrder(b.shift).compareTo(_shiftOrder(a.shift));
+            },
           ); // Mais recentes primeiro
 
     return Scaffold(
@@ -60,7 +72,7 @@ class AppointmentHistoryPage extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: pastAppointments.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (_, index) {
                 final appt = pastAppointments[index];
                 return _HistoryCard(appointment: appt);
@@ -78,7 +90,6 @@ class _HistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy');
-    final timeFormat = DateFormat('HH:mm');
 
     Color statusColor;
     IconData statusIcon;
@@ -126,10 +137,8 @@ class _HistoryCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Icon(Icons.access_time, color: Colors.grey.shade600, size: 18),
-                const SizedBox(width: 8),
                 Text(
-                  timeFormat.format(appointment.dateTime),
+                  'Turno: ${appointment.shift.label}',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,

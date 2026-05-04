@@ -200,18 +200,19 @@ class NotificationService {
   }
 
   Future<void> scheduleAppointmentReminders(Appointment appt) async {
-  // Web não suporta flutter_local_notifications
-  if (kIsWeb) return;
-  // Agenda 1 dia antes e 1 hora antes
-    final oneDayBefore = appt.dateTime.subtract(const Duration(days: 1));
-    final oneHourBefore = appt.dateTime.subtract(const Duration(hours: 1));
+    // Web não suporta flutter_local_notifications
+    if (kIsWeb) return;
+    // Agenda 1 dia antes e 1 hora antes, usando um horário-base do turno.
+    final appointmentDateTime = _appointmentDateTimeForShift(appt);
+    final oneDayBefore = appointmentDateTime.subtract(const Duration(days: 1));
+    final oneHourBefore = appointmentDateTime.subtract(const Duration(hours: 1));
 
     if (oneDayBefore.isAfter(DateTime.now())) {
       await _zonedSchedule(
         id: _randomId(),
         title: 'Consulta amanhã',
         body:
-            'Você tem consulta em ${appt.location} às ${_fmtTime(appt.dateTime)}.',
+            'Você tem consulta em ${appt.location} às ${_fmtTime(appointmentDateTime)}.',
         when: oneDayBefore,
       );
     }
@@ -220,10 +221,24 @@ class NotificationService {
         id: _randomId(),
         title: 'Consulta em 1 hora',
         body:
-            'Não esqueça: consulta em ${appt.location} às ${_fmtTime(appt.dateTime)}.',
+            'Não esqueça: consulta em ${appt.location} às ${_fmtTime(appointmentDateTime)}.',
         when: oneHourBefore,
       );
     }
+  }
+
+  DateTime _appointmentDateTimeForShift(Appointment appt) {
+    final hour = switch (appt.shift) {
+      AppointmentShift.morning => 8,
+      AppointmentShift.afternoon => 13,
+    };
+    return DateTime(
+      appt.dateTime.year,
+      appt.dateTime.month,
+      appt.dateTime.day,
+      hour,
+      0,
+    );
   }
 
   Future<void> scheduleMedicationReminders(Medication med) async {

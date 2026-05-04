@@ -816,6 +816,7 @@ class AppState extends ChangeNotifier {
   Appointment _mapAppointmentFromDb(Map<String, dynamic> row) {
     final dateTime = _parseDateTime(row['date_time']) ?? DateTime.now();
     final status = (row['status'] ?? '').toString().toLowerCase();
+    final shiftRaw = row['shift']?.toString();
 
     bool? attended;
     if (status == 'attended' || status == 'compareceu') {
@@ -829,6 +830,11 @@ class AppState extends ChangeNotifier {
       dateTime: dateTime,
       location: (row['location'] ?? 'Local n�o informado').toString(),
       specialty: (row['specialty'] ?? 'Consulta').toString(),
+      shift: shiftRaw != null
+          ? AppointmentShiftX.fromDb(shiftRaw)
+          : (dateTime.hour >= 12
+                ? AppointmentShift.afternoon
+                : AppointmentShift.morning),
       notes: row['notes']?.toString(),
       attended: attended,
     );
@@ -980,6 +986,7 @@ class AppState extends ChangeNotifier {
             'date_time': appt.dateTime.toUtc().toIso8601String(),
             'location': appt.location,
             'specialty': appt.specialty,
+            'shift': appt.shift.dbValue,
             'notes': appt.notes,
             'status': appt.attended == true
                 ? 'attended'
@@ -1021,6 +1028,7 @@ class AppState extends ChangeNotifier {
           'date_time': appt.dateTime.toUtc().toIso8601String(),
           'location': appt.location,
           'specialty': appt.specialty,
+          'shift': appt.shift.dbValue,
           'notes': appt.notes,
           'status': appt.attended == true
               ? 'attended'
