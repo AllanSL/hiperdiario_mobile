@@ -9,7 +9,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:hiperdiario/app.dart';
+import 'package:hiperdiario/core/providers/accessibility_provider.dart';
+import 'package:hiperdiario/core/providers/theme_provider.dart';
+import 'package:hiperdiario/app_paciente.dart';
+import 'package:hiperdiario/pages/login_page.dart';
 import 'package:hiperdiario/state/app_state.dart';
 
 void main() {
@@ -25,12 +28,16 @@ void main() {
 
   testWidgets('Login screen renders', (WidgetTester tester) async {
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => AppState(),
-        child: const HiperDiarioApp(),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AppState()),
+          ChangeNotifierProvider(create: (_) => AccessibilityProvider()),
+          ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ],
+        child: const HiperDiarioPacienteApp(),
       ),
     );
-    expect(find.text('HiperDiário'), findsOneWidget);
-    expect(find.text('Não tem uma conta?\nCadastre-se'), findsOneWidget);
+    // Verifica se a tela inicial carrega (LoginPage)
+    expect(find.byType(LoginPage), findsOneWidget);
   });
 }

@@ -19,12 +19,15 @@ class Municipio {
   factory Municipio.fromJson(Map<String, dynamic> json) {
     // O campo "municipio" vem como "TO - ABREULANDIA" — removemos o prefixo "XX - "
     final raw = (json['municipio'] as String? ?? '').trim();
-    final nome = raw.contains(' - ') ? raw.substring(raw.indexOf(' - ') + 3).trim() : raw;
+    final nome = raw.contains(' - ')
+        ? raw.substring(raw.indexOf(' - ') + 3).trim()
+        : raw;
 
     return Municipio(
       codigoUf: int.tryParse(json['codigo_uf']?.toString() ?? '') ?? 0,
       siglaUf: (json['uf'] as String? ?? '').trim(),
-      codigoMunicipio: int.tryParse(json['codigo_municipio']?.toString() ?? '') ?? 0,
+      codigoMunicipio:
+          int.tryParse(json['codigo_municipio']?.toString() ?? '') ?? 0,
       nome: nome,
     );
   }
@@ -87,11 +90,13 @@ class MunicipioService {
   /// Busca todos os municípios de um estado pela sigla da UF (ex: "TO").
   /// Retorna a lista em ordem alfabética.
   static Future<List<Municipio>> buscarMunicipios(String siglaUf) async {
-    final uri = Uri.parse(_baseUrl).replace(queryParameters: {
-      'sigla_uf': siglaUf.toUpperCase(),
-      'limit': '1000',
-      'offset': '0',
-    });
+    final uri = Uri.parse(_baseUrl).replace(
+      queryParameters: {
+        'sigla_uf': siglaUf.toUpperCase(),
+        'limit': '1000',
+        'offset': '0',
+      },
+    );
 
     const int maxAttempts = 3;
     const Duration retryDelay = Duration(milliseconds: 600);
@@ -106,7 +111,9 @@ class MunicipioService {
         debugPrint('[MunicipioService] Status: ${response.statusCode}');
 
         if (response.statusCode != 200) {
-          debugPrint('[MunicipioService] Erro ${response.statusCode}: ${response.body}');
+          debugPrint(
+            '[MunicipioService] Erro ${response.statusCode}: ${response.body}',
+          );
           // Retentar se ainda houver tentativas
           if (attempt < maxAttempts) await Future.delayed(retryDelay);
           continue;
@@ -114,7 +121,8 @@ class MunicipioService {
 
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final lista =
-            data['macrorregiao_regiao_saude_municipios'] as List<dynamic>? ?? [];
+            data['macrorregiao_regiao_saude_municipios'] as List<dynamic>? ??
+            [];
 
         debugPrint('[MunicipioService] Municípios recebidos: ${lista.length}');
 

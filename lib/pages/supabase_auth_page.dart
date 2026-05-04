@@ -24,7 +24,8 @@ class _SupabaseAuthPageState extends State<SupabaseAuthPage> {
     try {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text;
-      if (email.isEmpty || password.isEmpty) throw Exception('Preencha email e senha');
+      if (email.isEmpty || password.isEmpty)
+        throw Exception('Preencha email e senha');
 
       final res = await Supabase.instance.client.auth.signUp(
         email: email,
@@ -34,7 +35,10 @@ class _SupabaseAuthPageState extends State<SupabaseAuthPage> {
       if (res.user != null) {
         setState(() => _message = 'Usuário criado. Você está logado.');
       } else {
-        setState(() => _message = 'Verifique seu email para confirmação (se aplicado).');
+        setState(
+          () =>
+              _message = 'Verifique seu email para confirmação (se aplicado).',
+        );
       }
     } catch (e) {
       setState(() => _message = 'Erro: ${e.toString()}');
@@ -51,7 +55,8 @@ class _SupabaseAuthPageState extends State<SupabaseAuthPage> {
     try {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text;
-      if (email.isEmpty || password.isEmpty) throw Exception('Preencha email e senha');
+      if (email.isEmpty || password.isEmpty)
+        throw Exception('Preencha email e senha');
 
       final res = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
@@ -61,7 +66,9 @@ class _SupabaseAuthPageState extends State<SupabaseAuthPage> {
       if (res.user != null) {
         setState(() => _message = 'Logado como ${res.user!.email}');
       } else {
-        setState(() => _message = 'Login não retornou usuário (verifique credenciais)');
+        setState(
+          () => _message = 'Login não retornou usuário (verifique credenciais)',
+        );
       }
     } catch (e) {
       setState(() => _message = 'Erro: ${e.toString()}');
@@ -99,12 +106,18 @@ class _SupabaseAuthPageState extends State<SupabaseAuthPage> {
             if (user == null) ...[
               TextField(
                 controller: _emailCtrl,
-                decoration: AppInputDecoration.build(context, labelText: 'Email'),
+                decoration: AppInputDecoration.build(
+                  context,
+                  labelText: 'Email',
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _passwordCtrl,
-                decoration: AppInputDecoration.build(context, labelText: 'Senha'),
+                decoration: AppInputDecoration.build(
+                  context,
+                  labelText: 'Senha',
+                ),
                 obscureText: true,
               ),
               const SizedBox(height: 16),
@@ -113,7 +126,13 @@ class _SupabaseAuthPageState extends State<SupabaseAuthPage> {
                   Expanded(
                     child: FilledButton(
                       onPressed: _loading ? null : _signIn,
-                      child: _loading ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Entrar'),
+                      child: _loading
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Entrar'),
                     ),
                   ),
                   const SizedBox(width: 12),

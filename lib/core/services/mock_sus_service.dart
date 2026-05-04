@@ -65,17 +65,21 @@ class MockSusService {
     ];
   }
 
-  Future<List<Medication>> syncMedicationStocks(List<Medication> current) async {
+  Future<List<Medication>> syncMedicationStocks(
+    List<Medication> current,
+  ) async {
     // Simula atualização de estoque pela retirada na UBS
     await Future.delayed(const Duration(milliseconds: 600));
     return current
-        .map((m) => Medication(
-              id: m.id,
-              name: m.name,
-              dosage: m.dosage,
-              times: m.times,
-              stockUnits: m.stockUnits + 30, // recebeu nova caixa
-            ))
+        .map(
+          (m) => Medication(
+            id: m.id,
+            name: m.name,
+            dosage: m.dosage,
+            times: m.times,
+            stockUnits: m.stockUnits + 30, // recebeu nova caixa
+          ),
+        )
         .toList();
   }
 }

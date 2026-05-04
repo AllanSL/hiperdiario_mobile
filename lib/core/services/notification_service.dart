@@ -15,7 +15,8 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   final _plugin = FlutterLocalNotificationsPlugin();
-  final StreamController<String> _responseController = StreamController.broadcast();
+  final StreamController<String> _responseController =
+      StreamController.broadcast();
   Stream<String> get onNotificationResponse => _responseController.stream;
 
   String? _launchNotificationPayload;
@@ -25,18 +26,20 @@ class NotificationService {
 
   Future<void> init() async {
     if (kIsWeb) return; // Web: ignorar inicialização
-    
+
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
-    await _plugin.initialize(initSettings,
-        onDidReceiveNotificationResponse: (response) {
-      try {
-        final payload = response.payload;
-        if (payload != null && payload.isNotEmpty) {
-          _responseController.add(payload);
-        }
-      } catch (_) {}
-    });
+    await _plugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        try {
+          final payload = response.payload;
+          if (payload != null && payload.isNotEmpty) {
+            _responseController.add(payload);
+          }
+        } catch (_) {}
+      },
+    );
 
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp == true) {
@@ -84,15 +87,21 @@ class NotificationService {
     );
 
     await _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(medicationsChannel);
-    
+
     await _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(remindersChannel);
-    
+
     await _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(testChannel);
   }
 
@@ -107,9 +116,9 @@ class NotificationService {
   Future<void> requestExactAlarmPermission() async {
     if (kIsWeb) return;
     if (defaultTargetPlatform != TargetPlatform.android) return;
-    
+
     final status = await Permission.scheduleExactAlarm.request();
-    
+
     // Se não foi concedida, abrir as configurações do sistema
     if (!status.isGranted) {
       await openAppSettings();
@@ -141,7 +150,7 @@ class NotificationService {
   /// Envia uma notificação de teste imediata (para verificar se notificações funcionam)
   Future<void> showTestNotification() async {
     if (kIsWeb) return;
-    
+
     await _plugin.show(
       999999,
       'Teste de Notificação',
@@ -160,23 +169,23 @@ class NotificationService {
   /// Testa notificação agendada (15 segundos no futuro)
   Future<void> showScheduledTestNotification() async {
     if (kIsWeb) return;
-    
+
     // Verificar permissão primeiro
     final hasPermission = await hasExactAlarmPermission();
-    
+
     if (!hasPermission) {
       await requestExactAlarmPermission();
-      
+
       // Verificar novamente
       final hasPermissionNow = await hasExactAlarmPermission();
       if (!hasPermissionNow) {
         return;
       }
     }
-    
+
     final scheduledTime = DateTime.now().add(const Duration(seconds: 15));
     final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
-    
+
     await _plugin.zonedSchedule(
       888888,
       'Teste ZonedSchedule',
@@ -205,7 +214,9 @@ class NotificationService {
     // Agenda 1 dia antes e 1 hora antes, usando um horário-base do turno.
     final appointmentDateTime = _appointmentDateTimeForShift(appt);
     final oneDayBefore = appointmentDateTime.subtract(const Duration(days: 1));
-    final oneHourBefore = appointmentDateTime.subtract(const Duration(hours: 1));
+    final oneHourBefore = appointmentDateTime.subtract(
+      const Duration(hours: 1),
+    );
 
     if (oneDayBefore.isAfter(DateTime.now())) {
       await _zonedSchedule(
@@ -265,10 +276,24 @@ class NotificationService {
     _medNotificationIds.clear();
 
     for (final group in grouped.values) {
-      final timeLabel = _fmtTime(DateTime(now.year, now.month, now.day, group.time.hour, group.time.minute));
+      final timeLabel = _fmtTime(
+        DateTime(
+          now.year,
+          now.month,
+          now.day,
+          group.time.hour,
+          group.time.minute,
+        ),
+      );
       final medsAtTime = group.meds;
       for (int day = 0; day < 30; day++) {
-        final scheduledDate = DateTime(now.year, now.month, now.day, group.time.hour, group.time.minute).add(Duration(days: day));
+        final scheduledDate = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          group.time.hour,
+          group.time.minute,
+        ).add(Duration(days: day));
         if (!scheduledDate.isAfter(now)) continue;
 
         try {
@@ -302,7 +327,8 @@ class NotificationService {
     final groups = <String, _MedicationGroup>{};
     for (final med in meds) {
       for (final time in med.times) {
-        final key = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+        final key =
+            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
         groups.putIfAbsent(key, () => _MedicationGroup(time, [])).meds.add(med);
       }
     }
@@ -318,7 +344,7 @@ class NotificationService {
     String? payload,
   }) async {
     final tzTime = tz.TZDateTime.from(when, tz.local);
-    
+
     await _plugin.zonedSchedule(
       id,
       title,

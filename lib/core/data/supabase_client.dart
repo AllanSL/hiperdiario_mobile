@@ -15,7 +15,7 @@ class SupabaseClientService {
 
     if (url == null || anonKey == null) {
       throw Exception(
-        'Supabase configuration not found. Create a .env file with SUPABASE_URL and SUPABASE_ANON_KEY (see .env.example)'
+        'Supabase configuration not found. Create a .env file with SUPABASE_URL and SUPABASE_ANON_KEY (see .env.example)',
       );
     }
 

@@ -51,6 +51,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   // Especialidades
   List<CnesProfissional> _todosProfissionais = [];
   List<CnesProfissional> _profissionaisFiltrados = [];
+  CnesProfissional? _profissionalSelecionado;
   bool _especialidadesCarregando = false;
   bool _dropdownEspecAberto = false;
   bool _especModoDigitacao = false;
@@ -163,7 +164,8 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           widget.appointment!.location.trim().isNotEmpty) {
         final appointmentLocation = widget.appointment!.location.toLowerCase();
         for (final est in resultado) {
-          if (est.nomeFantasia.toLowerCase() == appointmentLocation) {
+          if (est.nomeFantasia.toLowerCase() == appointmentLocation ||
+              est.codigoCnes.toString() == appointmentLocation) {
             _estabelecimenteSelecionado = est;
             _carregarEspecialidades(est);
             break;
@@ -251,12 +253,34 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     );
 
     if (mounted) {
+      CnesProfissional? found;
+      if (widget.appointment != null) {
+        final targetId = widget.appointment!.professionalId;
+        final targetName = widget.appointment!.professionalName;
+        final targetSpec = widget.appointment!.specialty;
+
+        for (final p in profList) {
+          if (targetId != null && p.id == targetId) {
+            found = p;
+            break;
+          } else if (p.nome == targetName && p.especialidade == targetSpec) {
+            found = p;
+            break;
+          }
+        }
+      }
+
       setState(() {
         _todosProfissionais = profList;
         _profissionaisFiltrados = profList;
         _especialidadesCarregando = false;
+        if (found != null) {
+          _profissionalSelecionado = found;
+          _specialtyController.text = found.displayText;
+        }
       });
-      if (_selectedDate != null && _specialtyController.text.trim().isNotEmpty) {
+      if (_selectedDate != null &&
+          _specialtyController.text.trim().isNotEmpty) {
         await _refreshDateAvailability();
       }
     }
@@ -338,6 +362,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   }
 
   void _selecionarEspecialidade(CnesProfissional prof) {
+    setState(() {
+      _profissionalSelecionado = prof;
+    });
     _specialtyController.text = prof.displayText;
     _specialtyController.selection = TextSelection.collapsed(
       offset: prof.displayText.length,
@@ -485,39 +512,72 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       return;
     }
 
-    final startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0).toUtc();
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999).toUtc();
+    final startOfDay = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      0,
+      0,
+      0,
+    ).toUtc();
+    final endOfDay = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      23,
+      59,
+      59,
+      999,
+    ).toUtc();
     final dataInicio = startOfDay.toIso8601String();
     final dataFim = endOfDay.toIso8601String();
 
     int count = 0;
     try {
-      final appointmentsResp = await Supabase.instance.client
+      var query = Supabase.instance.client
           .from('appointments')
           .select('id')
-          .eq('location', _locationController.text.trim())
-          .eq('specialty', _specialtyController.text.trim())
+          .eq('location', _estabelecimenteSelecionado!.codigoCnes.toString())
           .eq('shift', _selectedShift.dbValue)
           .gte('date_time', dataInicio)
           .lte('date_time', dataFim);
+
+      if (_profissionalSelecionado!.id != null) {
+        query = query.eq('professional_id', _profissionalSelecionado!.id!);
+      } else {
+        query = query
+            .eq('specialty', _profissionalSelecionado!.especialidade)
+            .eq('professional_name', _profissionalSelecionado!.nome);
+      }
+
+      final appointmentsResp = await query;
       count = appointmentsResp.length;
       if (widget.appointment != null) {
-        final existsSameId = appointmentsResp.any((item) =>
-            item['id'] == widget.appointment!.id);
+        final existsSameId = appointmentsResp.any(
+          (item) => item['id'] == widget.appointment!.id,
+        );
         if (existsSameId) count = count - 1;
       }
     } catch (_) {}
 
     bool blocked = false;
     try {
-      final blockedResp = await Supabase.instance.client
+      var query = Supabase.instance.client
           .from('blocked_times')
           .select('date_time')
-          .eq('location', _locationController.text.trim())
-          .eq('specialty', _specialtyController.text.trim())
+          .eq('location', _estabelecimenteSelecionado!.codigoCnes.toString())
           .gte('date_time', dataInicio)
-          .lte('date_time', dataFim)
-          .limit(1);
+          .lte('date_time', dataFim);
+
+      if (_profissionalSelecionado!.id != null) {
+        query = query.eq('professional_id', _profissionalSelecionado!.id!);
+      } else {
+        query = query
+            .eq('specialty', _profissionalSelecionado!.especialidade)
+            .eq('professional_name', _profissionalSelecionado!.nome);
+      }
+
+      final blockedResp = await query.limit(1);
       if (blockedResp.isNotEmpty) {
         blocked = true;
       }
@@ -547,13 +607,16 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     if (_selectedDate == null) return false;
     if (_isDateLoading) return false;
     if (!_dateAvailabilityCalculated) return false;
-    if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0) return false;
+    if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0)
+      return false;
     return true;
   }
 
   void _showDateAvailabilityError() {
     if (_isDateBlocked) {
-      _showToast('Dia indisponível / atendimento suspenso. Escolha outra data.');
+      _showToast(
+        'Dia indisponível / atendimento suspenso. Escolha outra data.',
+      );
     } else if (_isDateFull) {
       _showToast('Limite do turno atingido. Escolha outra data ou turno.');
     } else if ((_dailyCapacity ?? 0) == 0) {
@@ -568,17 +631,12 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       SnackBar(
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: theme.colorScheme.error,
         duration: const Duration(seconds: 2),
         content: Row(
           children: [
-            Icon(
-              Icons.error_outline,
-              color: theme.colorScheme.onError,
-            ),
+            Icon(Icons.error_outline, color: theme.colorScheme.onError),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -614,8 +672,10 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           widget.appointment?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       dateTime: dateTime,
-      location: _locationController.text.trim(),
+      location: _estabelecimenteSelecionado!.codigoCnes.toString(),
       specialty: _specialtyController.text.trim(),
+      professionalName: _profissionalSelecionado?.nome,
+      professionalId: _profissionalSelecionado?.id,
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
@@ -697,8 +757,12 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                   child: TextFormField(
                     key: _locationFieldKey,
                     controller: _locationModoDigitacao
-                      ? _locationController
-                      : TextEditingController(text: formatCnesDisplayName(_locationController.text)),
+                        ? _locationController
+                        : TextEditingController(
+                            text: formatCnesDisplayName(
+                              _locationController.text,
+                            ),
+                          ),
                     focusNode: _locationFocusNode,
                     enabled: !_locationFixa,
                     readOnly: !_locationModoDigitacao,
@@ -727,36 +791,36 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                               ),
                             )
                           : _locationFixa
-                              ? null
-                              : _locationController.text.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear),
-                                      onPressed: () {
-                                        _estabelecimenteSelecionado = null;
-                                        _locationController.clear();
-                                        setState(() {
-                                          _locationModoDigitacao = true;
-                                          _locationFixa = false;
-                                        });
-                                        _locationFocusNode.requestFocus();
-                                        _abrirDropdown();
-                                      },
-                                    )
-                                  : IconButton(
-                                      icon: Icon(
-                                        _dropdownAberto
-                                            ? Icons.arrow_drop_up
-                                            : Icons.arrow_drop_down,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      onPressed: () {
-                                        if (_dropdownAberto) {
-                                          _fecharDropdown();
-                                        } else {
-                                          _onLocationTap();
-                                        }
-                                      },
-                                    ),
+                          ? null
+                          : _locationController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _estabelecimenteSelecionado = null;
+                                _locationController.clear();
+                                setState(() {
+                                  _locationModoDigitacao = true;
+                                  _locationFixa = false;
+                                });
+                                _locationFocusNode.requestFocus();
+                                _abrirDropdown();
+                              },
+                            )
+                          : IconButton(
+                              icon: Icon(
+                                _dropdownAberto
+                                    ? Icons.arrow_drop_up
+                                    : Icons.arrow_drop_down,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              onPressed: () {
+                                if (_dropdownAberto) {
+                                  _fecharDropdown();
+                                } else {
+                                  _onLocationTap();
+                                }
+                              },
+                            ),
                     ),
                     validator: (v) => v == null || v.trim().isEmpty
                         ? 'Informe o local'
@@ -1048,9 +1112,8 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                         const SizedBox(height: 6),
                         Text(
                           'Selecione a data para liberar o turno.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ],

@@ -28,7 +28,10 @@ class ViaCepService {
     }
 
     final uri = Uri.parse('https://viacep.com.br/ws/$digits/json/');
-    final response = await http.get(uri, headers: {'Accept': 'application/json'});
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json'},
+    );
 
     if (response.statusCode != 200) {
       throw Exception('Erro ao consultar CEP.');
@@ -39,14 +42,14 @@ class ViaCepService {
       throw Exception('CEP não encontrado.');
     }
 
-  final uf = (data['uf'] ?? '').toString();
-  final localidade = (data['localidade'] ?? '').toString();
-  final logradouro = (data['logradouro'] ?? '').toString().trim();
-  final bairro = (data['bairro'] ?? '').toString().trim();
-  final complemento = (data['complemento'] ?? '').toString().trim();
-  final ibgeRaw = (data['ibge'] ?? '').toString().trim();
-  final ibgeDigits = ibgeRaw.replaceAll(RegExp(r'\D'), '');
-  final codigoIbge = int.tryParse(ibgeDigits);
+    final uf = (data['uf'] ?? '').toString();
+    final localidade = (data['localidade'] ?? '').toString();
+    final logradouro = (data['logradouro'] ?? '').toString().trim();
+    final bairro = (data['bairro'] ?? '').toString().trim();
+    final complemento = (data['complemento'] ?? '').toString().trim();
+    final ibgeRaw = (data['ibge'] ?? '').toString().trim();
+    final ibgeDigits = ibgeRaw.replaceAll(RegExp(r'\D'), '');
+    final codigoIbge = int.tryParse(ibgeDigits);
     if (uf.isEmpty || localidade.isEmpty) {
       throw Exception('Resposta inválida do ViaCEP.');
     }

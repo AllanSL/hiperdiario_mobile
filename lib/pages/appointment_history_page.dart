@@ -23,14 +23,14 @@ class AppointmentHistoryPage extends StatelessWidget {
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
     final pastAppointments =
-        allAppointments.where((appt) => appt.dateTime.isBefore(startOfToday)).toList()
-          ..sort(
-            (a, b) {
-              final dateCmp = b.dateTime.compareTo(a.dateTime);
-              if (dateCmp != 0) return dateCmp;
-              return _shiftOrder(b.shift).compareTo(_shiftOrder(a.shift));
-            },
-          ); // Mais recentes primeiro
+        allAppointments
+            .where((appt) => appt.dateTime.isBefore(startOfToday))
+            .toList()
+          ..sort((a, b) {
+            final dateCmp = b.dateTime.compareTo(a.dateTime);
+            if (dateCmp != 0) return dateCmp;
+            return _shiftOrder(b.shift).compareTo(_shiftOrder(a.shift));
+          }); // Mais recentes primeiro
 
     return Scaffold(
       appBar: AppBar(title: const Text('Histórico de Consultas')),
@@ -148,7 +148,7 @@ class _HistoryCard extends StatelessWidget {
             ),
             const Divider(height: 20),
 
-            // Especialidade
+            // Especialidade e Profissional
             Row(
               children: [
                 const Icon(
@@ -158,12 +158,25 @@ class _HistoryCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    appointment.specialty,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appointment.specialty,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (appointment.professionalName != null)
+                        Text(
+                          appointment.professionalName!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -177,7 +190,11 @@ class _HistoryCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    appointment.location,
+                    appointment.location ==
+                            context.read<AppState>().patient?.ubs
+                        ? (context.read<AppState>().patient?.ubsName ??
+                              appointment.location)
+                        : appointment.location,
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                   ),
                 ),

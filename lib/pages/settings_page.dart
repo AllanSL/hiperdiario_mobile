@@ -21,7 +21,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _checkPermission() async {
-    final hasPermission = await NotificationService.instance.hasExactAlarmPermission();
+    final hasPermission = await NotificationService.instance
+        .hasExactAlarmPermission();
     if (mounted) {
       setState(() {
         _hasExactAlarmPermission = hasPermission;
@@ -39,19 +40,26 @@ class _SettingsPageState extends State<SettingsPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           duration: const Duration(seconds: 2),
           content: Row(
             children: [
-              Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.onPrimaryContainer),
+              Icon(
+                Icons.check_circle_outline,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Permissão de alarmes concedida',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
             ],
@@ -85,16 +93,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.accessibility_new,
-                          color: accessibility.isAccessibilityMode
-                              ? Colors.teal
-                              : Colors.grey),
+                      Icon(
+                        Icons.accessibility_new,
+                        color: accessibility.isAccessibilityMode
+                            ? Colors.teal
+                            : Colors.grey,
+                      ),
                       SizedBox(width: 12 * scale),
                       const Expanded(
                         child: Text(
                           'Modo Acessibilidade',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -102,7 +114,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   SizedBox(height: 8 * scale),
                   Text(
                     'Aumenta o tamanho dos textos, botões e ícones para facilitar a leitura e interação.',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
                   ),
                   SizedBox(height: 16 * scale),
                   // Seletor de escala
@@ -138,7 +153,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                 isSelected
                                     ? Icons.radio_button_checked
                                     : Icons.radio_button_off,
-                                color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                color: isSelected
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
                               ),
                               SizedBox(width: 12 * scale),
                               Expanded(
@@ -207,15 +224,17 @@ class _SettingsPageState extends State<SettingsPage> {
                         color: _isLoading
                             ? Colors.grey
                             : (_hasExactAlarmPermission
-                                ? Colors.green
-                                : Colors.orange),
+                                  ? Colors.green
+                                  : Colors.orange),
                       ),
                       SizedBox(width: 12 * scale),
                       const Expanded(
                         child: Text(
                           'Lembretes de medicamentos',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       if (_isLoading)
@@ -227,7 +246,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       else
                         Chip(
                           label: Text(
-                              _hasExactAlarmPermission ? 'Ativo' : 'Inativo'),
+                            _hasExactAlarmPermission ? 'Ativo' : 'Inativo',
+                          ),
                           backgroundColor: _hasExactAlarmPermission
                               ? Colors.green.shade50
                               : Colors.orange.shade50,
@@ -246,7 +266,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         ? 'O app tem permissão para enviar lembretes nos horários exatos dos seus medicamentos.'
                         : 'Para receber lembretes nos horários corretos, é necessário conceder permissão de alarmes exatos.',
                     style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
                   ),
                   if (!_hasExactAlarmPermission && !_isLoading) ...[
                     SizedBox(height: 12 * scale),
@@ -276,8 +298,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   const Text(
                     'HiperDiário',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   SizedBox(height: 8),
                   Text(

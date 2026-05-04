@@ -53,7 +53,9 @@ class CpfInputFormatter extends TextInputFormatter {
 class DateInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     if (newValue.selection.baseOffset == 0) {
       return newValue;
     }
@@ -131,19 +133,25 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: isError ? colorScheme.errorContainer : colorScheme.primaryContainer,
+        backgroundColor: isError
+            ? colorScheme.errorContainer
+            : colorScheme.primaryContainer,
         content: Row(
           children: [
             Icon(
               isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: isError ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer,
+              color: isError
+                  ? colorScheme.onErrorContainer
+                  : colorScheme.onPrimaryContainer,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 message,
                 style: TextStyle(
-                  color: isError ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer,
+                  color: isError
+                      ? colorScheme.onErrorContainer
+                      : colorScheme.onPrimaryContainer,
                 ),
               ),
             ),
@@ -175,7 +183,7 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
           .where((name) => name.toLowerCase() != realName.toLowerCase())
           .take(3)
           .toList();
-      
+
       _nameOptions.add(realName);
       _nameOptions.shuffle(Random());
 
@@ -193,7 +201,10 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedName == null) {
-      _showSnackBar('Por favor, selecione qual é o seu nome nas opções.', isError: true);
+      _showSnackBar(
+        'Por favor, selecione qual é o seu nome nas opções.',
+        isError: true,
+      );
       return;
     }
 
@@ -206,7 +217,7 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
 
     try {
       final appState = Provider.of<AppState>(context, listen: false);
-      
+
       await appState.recuperarSenha(
         cpf: _cpfController.text,
         novaSenha: _newPasswordController.text,
@@ -229,10 +240,7 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recuperar Senha'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Recuperar Senha'), elevation: 0),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -280,7 +288,8 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [CpfInputFormatter()],
                     validator: (value) {
-                      if (value == null || value.isEmpty) return 'Informe o CPF';
+                      if (value == null || value.isEmpty)
+                        return 'Informe o CPF';
                       if (value.length < 14) return 'CPF incompleto';
                       return null;
                     },
@@ -300,7 +309,8 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [DateInputFormatter()],
                     validator: (value) {
-                      if (value == null || value.isEmpty) return 'Informe a data';
+                      if (value == null || value.isEmpty)
+                        return 'Informe a data';
                       if (value.length < 10) return 'Data incompleta';
                       return null;
                     },
@@ -324,9 +334,13 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
                           )
                         : const Text(
                             'Continuar',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
-            )],
+                  ),
+                ],
 
                 if (_step == 2) ...[
                   Container(
@@ -361,13 +375,20 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
                       labelText: 'Nova Senha',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscureNewPass ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscureNewPass = !_obscureNewPass),
+                        icon: Icon(
+                          _obscureNewPass
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureNewPass = !_obscureNewPass),
                       ),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) return 'Informe a nova senha';
-                      if (value.length < 6) return 'A senha deve ter no mínimo 6 caracteres';
+                      if (value == null || value.isEmpty)
+                        return 'Informe a nova senha';
+                      if (value.length < 6)
+                        return 'A senha deve ter no mínimo 6 caracteres';
                       return null;
                     },
                     textInputAction: TextInputAction.next,
@@ -383,13 +404,21 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
                       labelText: 'Confirmar Nova Senha',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscureConfirmPass ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscureConfirmPass = !_obscureConfirmPass),
+                        icon: Icon(
+                          _obscureConfirmPass
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscureConfirmPass = !_obscureConfirmPass,
+                        ),
                       ),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) return 'Confirme a senha';
-                      if (value != _newPasswordController.text) return 'As senhas não coincidem';
+                      if (value == null || value.isEmpty)
+                        return 'Confirme a senha';
+                      if (value != _newPasswordController.text)
+                        return 'As senhas não coincidem';
                       return null;
                     },
                     onFieldSubmitted: (_) => _submit(),
@@ -399,7 +428,9 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
                   Row(
                     children: [
                       TextButton(
-                        onPressed: _isLoading ? null : () => setState(() => _step = 1),
+                        onPressed: _isLoading
+                            ? null
+                            : () => setState(() => _step = 1),
                         child: const Text('Voltar'),
                       ),
                       const SizedBox(width: 8),
@@ -416,11 +447,16 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
                               ? const SizedBox(
                                   height: 24,
                                   width: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                  ),
                                 )
                               : const Text(
                                   'Redefinir Senha',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
                         ),
                       ),

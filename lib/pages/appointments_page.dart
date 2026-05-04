@@ -17,18 +17,18 @@ class AppointmentsPage extends StatelessWidget {
 
     // Filtrar apenas consultas futuras
     final now = DateTime.now();
-    final upcomingAppointments = allAppointments.where((appt) {
-      final date = appt.dateTime;
-      return date.isAfter(now) ||
-          (date.year == now.year &&
-              date.month == now.month &&
-              date.day == now.day);
-    }).toList()
-      ..sort((a, b) {
-        final dateCmp = a.dateTime.compareTo(b.dateTime);
-        if (dateCmp != 0) return dateCmp;
-        return _shiftOrder(a.shift).compareTo(_shiftOrder(b.shift));
-      });
+    final upcomingAppointments =
+        allAppointments.where((appt) {
+          final date = appt.dateTime;
+          return date.isAfter(now) ||
+              (date.year == now.year &&
+                  date.month == now.month &&
+                  date.day == now.day);
+        }).toList()..sort((a, b) {
+          final dateCmp = a.dateTime.compareTo(b.dateTime);
+          if (dateCmp != 0) return dateCmp;
+          return _shiftOrder(a.shift).compareTo(_shiftOrder(b.shift));
+        });
 
     if (upcomingAppointments.isEmpty) {
       return Center(
@@ -270,7 +270,7 @@ class _AppointmentCard extends StatelessWidget {
             ),
             const Divider(height: 24),
 
-            // Especialidade
+            // Especialidade e Profissional
             Row(
               children: [
                 Icon(
@@ -280,9 +280,18 @@ class _AppointmentCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    appointment.specialty,
-                    style: textTheme.titleMedium,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(appointment.specialty, style: textTheme.titleMedium),
+                      if (appointment.professionalName != null)
+                        Text(
+                          appointment.professionalName!,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -300,7 +309,11 @@ class _AppointmentCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    appointment.location,
+                    appointment.location ==
+                            context.read<AppState>().patient?.ubs
+                        ? (context.read<AppState>().patient?.ubsName ??
+                              appointment.location)
+                        : appointment.location,
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),

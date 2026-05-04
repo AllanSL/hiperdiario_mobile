@@ -13,7 +13,10 @@ class IbgeService {
     required int codigoUf,
   }) async {
     final uri = Uri.parse('$_baseUrl/municipios/$idMunicipio');
-    final response = await http.get(uri, headers: {'Accept': 'application/json'});
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json'},
+    );
 
     if (response.statusCode != 200) {
       return null;
@@ -36,7 +39,10 @@ class IbgeService {
     required String siglaUf,
   }) async {
     final uri = Uri.parse('$_baseUrl/estados/$codigoUf/municipios');
-    final response = await http.get(uri, headers: {'Accept': 'application/json'});
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json'},
+    );
 
     if (response.statusCode != 200) {
       return [];

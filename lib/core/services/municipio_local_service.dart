@@ -36,23 +36,25 @@ class MunicipioLocalService {
       final nome = _lerTexto(row, headerMap['nome']);
       if (nome.isEmpty) continue;
 
-  final sigla = _lerTexto(row, headerMap['sigla_uf']);
-  final codigoUf = _lerInteiro(row, headerMap['id_uf']);
-  final codigoMunicipio6 = _lerInteiro(row, headerMap['id_municipio_6']);
-  final codigoMunicipio7 = _lerInteiro(row, headerMap['id_municipio']);
+      final sigla = _lerTexto(row, headerMap['sigla_uf']);
+      final codigoUf = _lerInteiro(row, headerMap['id_uf']);
+      final codigoMunicipio6 = _lerInteiro(row, headerMap['id_municipio_6']);
+      final codigoMunicipio7 = _lerInteiro(row, headerMap['id_municipio']);
 
       if (sigla.isEmpty && codigoUf == null) continue;
-    final codigoMunicipio = codigoMunicipio6 ?? (codigoMunicipio7 != null
-      ? (codigoMunicipio7 ~/ 10)
-      : null);
+      final codigoMunicipio =
+          codigoMunicipio6 ??
+          (codigoMunicipio7 != null ? (codigoMunicipio7 ~/ 10) : null);
       if (codigoMunicipio == null) continue;
 
-      municipios.add(Municipio(
-        codigoUf: codigoUf ?? 0,
-        siglaUf: sigla,
-        codigoMunicipio: codigoMunicipio,
-        nome: nome,
-      ));
+      municipios.add(
+        Municipio(
+          codigoUf: codigoUf ?? 0,
+          siglaUf: sigla,
+          codigoMunicipio: codigoMunicipio,
+          nome: nome,
+        ),
+      );
     }
 
     final vistos = <int>{};
@@ -83,25 +85,27 @@ class MunicipioLocalService {
     }
 
     return {
-  'nome': pick(['nome', 'municipio', 'cidade']) ?? -1,
-  'sigla_uf': pick(['sigla_uf', 'uf', 'estado']) ?? -1,
-  'id_uf': pick(['id_uf', 'codigo_uf', 'cod_uf', 'ibge_uf']) ?? -1,
-  'id_municipio_6': pick([
-    'id_municipio_6',
-    'codigo_municipio_6',
-    'cod_municipio_6',
-    'ibge_municipio'
-      ]) ??
-      -1,
-  'id_municipio': pick([
-    'id_municipio',
-    'codigo_municipio',
-    'cod_municipio',
-    'ibge_municipio_7',
-    'codigo_municipio_7',
-    'cod_municipio_7'
-      ]) ??
-      -1,
+      'nome': pick(['nome', 'municipio', 'cidade']) ?? -1,
+      'sigla_uf': pick(['sigla_uf', 'uf', 'estado']) ?? -1,
+      'id_uf': pick(['id_uf', 'codigo_uf', 'cod_uf', 'ibge_uf']) ?? -1,
+      'id_municipio_6':
+          pick([
+            'id_municipio_6',
+            'codigo_municipio_6',
+            'cod_municipio_6',
+            'ibge_municipio',
+          ]) ??
+          -1,
+      'id_municipio':
+          pick([
+            'id_municipio',
+            'codigo_municipio',
+            'cod_municipio',
+            'ibge_municipio_7',
+            'codigo_municipio_7',
+            'cod_municipio_7',
+          ]) ??
+          -1,
     };
   }
 

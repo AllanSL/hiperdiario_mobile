@@ -56,9 +56,9 @@ class AccessibilityProvider extends ChangeNotifier {
 
   /// Retorna EdgeInsets escalados proporcionalmente
   EdgeInsets scaledPadding(EdgeInsets base) => EdgeInsets.only(
-        left: base.left * _scale.factor,
-        top: base.top * _scale.factor,
-        right: base.right * _scale.factor,
-        bottom: base.bottom * _scale.factor,
-      );
+    left: base.left * _scale.factor,
+    top: base.top * _scale.factor,
+    right: base.right * _scale.factor,
+    bottom: base.bottom * _scale.factor,
+  );
 }

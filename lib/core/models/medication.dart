@@ -4,7 +4,8 @@ class Medication {
   final String dosage; // ex: 500mg 1x ao dia
   final List<TimeOfDayLite> times; // horários do dia
   int stockUnits; // unidades em casa
-  final String? dispensationId; // Identificador da UBS, se nulo = criado pelo paciente.
+  final String?
+  dispensationId; // Identificador da UBS, se nulo = criado pelo paciente.
 
   Medication({
     required this.id,

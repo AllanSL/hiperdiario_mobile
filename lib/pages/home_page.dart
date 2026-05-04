@@ -51,16 +51,19 @@ class _HomePageState extends State<HomePage> {
     _canShowAppointmentFab = _index == 2;
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateFabVisibility());
     // Inscreve-se nas respostas de notificações (quando o usuário interage)
-    _notificationResponseSub =
-        NotificationService.instance.onNotificationResponse.listen((payload) {
-      if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _onNotificationPayloadReceived(payload);
-      });
-    });
+    _notificationResponseSub = NotificationService
+        .instance
+        .onNotificationResponse
+        .listen((payload) {
+          if (!mounted) return;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _onNotificationPayloadReceived(payload);
+          });
+        });
 
     // Trata o payload de notificação que abriu o app a partir do estado finalizado.
-    _pendingLaunchPayload = NotificationService.instance.popLaunchNotificationPayload();
+    _pendingLaunchPayload = NotificationService.instance
+        .popLaunchNotificationPayload();
     if (_pendingLaunchPayload != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -122,7 +125,10 @@ class _HomePageState extends State<HomePage> {
         return StatefulBuilder(
           builder: (ctx, setState) {
             return AlertDialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 24.0,
+              ),
               title: Text(
                 meds.length == 1
                     ? 'Tomou seu remédio?'
@@ -205,7 +211,8 @@ class _HomePageState extends State<HomePage> {
 
     // Tenta uma última vez antes de descartar.
     if (!mounted) return;
-    if (context.read<AppState>().medications.isNotEmpty && _pendingLaunchPayload != null) {
+    if (context.read<AppState>().medications.isNotEmpty &&
+        _pendingLaunchPayload != null) {
       _navigateToMedicationsPage();
       _onNotificationPayloadReceived(_pendingLaunchPayload!);
     }
@@ -252,11 +259,11 @@ class _HomePageState extends State<HomePage> {
     if (_isNavigating) {
       if (_isPageFullyVisible(_index)) {
         _navigationReleaseTimer ??= Timer(_fabDebounce, () {
-            _navigationReleaseTimer = null;
-            if (_isPageFullyVisible(_index) && mounted) {
-              setState(() => _isNavigating = false);
-            }
-          });
+          _navigationReleaseTimer = null;
+          if (_isPageFullyVisible(_index) && mounted) {
+            setState(() => _isNavigating = false);
+          }
+        });
       } else {
         _navigationReleaseTimer?.cancel();
         _navigationReleaseTimer = null;
@@ -301,7 +308,8 @@ class _HomePageState extends State<HomePage> {
     } else {
       _appointmentFabTimer?.cancel();
       _appointmentFabTimer = null;
-      if (_canShowAppointmentFab) setState(() => _canShowAppointmentFab = false);
+      if (_canShowAppointmentFab)
+        setState(() => _canShowAppointmentFab = false);
     }
   }
 
@@ -367,25 +375,26 @@ class _HomePageState extends State<HomePage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primaryContainer,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
                       duration: const Duration(seconds: 2),
                       content: Row(
                         children: [
                           Icon(
                             Icons.sync,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Buscando atualizações na UBS',
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -411,25 +420,26 @@ class _HomePageState extends State<HomePage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primaryContainer,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
                       duration: const Duration(seconds: 2),
                       content: Row(
                         children: [
                           Icon(
                             Icons.sync,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Buscando atualizações na UBS',
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -706,41 +716,41 @@ class _HomePageState extends State<HomePage> {
             );
           },
           destinations: [
-          NavigationDestination(
-            icon: Icon(
-              Icons.person_outline,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            NavigationDestination(
+              icon: Icon(
+                Icons.person_outline,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              selectedIcon: Icon(
+                Icons.person,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
+              label: 'Perfil',
             ),
-            selectedIcon: Icon(
-              Icons.person,
-              color: Theme.of(context).colorScheme.onPrimary,
+            NavigationDestination(
+              icon: Icon(
+                Icons.medication_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              selectedIcon: Icon(
+                Icons.medication,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
+              label: 'Medicamentos',
             ),
-            label: 'Perfil',
-          ),
-          NavigationDestination(
-            icon: Icon(
-              Icons.medication_outlined,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            NavigationDestination(
+              icon: Icon(
+                Icons.event_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              selectedIcon: Icon(
+                Icons.event,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
+              label: 'Consultas',
             ),
-            selectedIcon: Icon(
-              Icons.medication,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-            label: 'Medicamentos',
-          ),
-          NavigationDestination(
-            icon: Icon(
-              Icons.event_outlined,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            selectedIcon: Icon(
-              Icons.event,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-            label: 'Consultas',
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

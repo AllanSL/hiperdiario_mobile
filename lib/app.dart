@@ -20,10 +20,7 @@ class HiperDiarioApp extends StatelessWidget {
         bodyMedium: TextStyle(fontSize: 18),
         labelLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
       ),
-      buttonTheme: const ButtonThemeData(
-        minWidth: 64,
-        height: 48,
-      ),
+      buttonTheme: const ButtonThemeData(minWidth: 64, height: 48),
     );
 
     return MaterialApp(
@@ -36,17 +33,14 @@ class HiperDiarioApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('pt', 'BR'),
-      ],
+      supportedLocales: const [Locale('pt', 'BR')],
       // Aplica comportamento de scroll global: sem bounce/alongamento e sem glow.
       scrollBehavior: const _NoBounceScrollBehavior(),
       // Suporte melhor à acessibilidade: respeita escala do sistema
       // e aumenta áreas de toque por padrão via visualDensity.
       home: Consumer<AppState>(
-        builder: (_, app, child) => app.isLogged
-            ? const HomePage()
-            : const LoginPage(),
+        builder: (_, app, child) =>
+            app.isLogged ? const HomePage() : const LoginPage(),
       ),
     );
   }
@@ -60,7 +54,11 @@ class _NoBounceScrollBehavior extends ScrollBehavior {
   }
 
   @override
-  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) {
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
     return child;
   }
 }

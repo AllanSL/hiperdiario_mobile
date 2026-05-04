@@ -294,6 +294,11 @@ class _LoginPageState extends State<LoginPage> {
           normalized.contains('cpf invalido')) {
         msg = 'CPF inválido. Confira os números e tente novamente.';
         shortCpfMsg = 'CPF inválido';
+      } else if (normalized.contains('acesso negado') ||
+          normalized.contains('exclusivo para pacientes')) {
+        msg = 'Credenciais inválidas. Verifique seu CPF e senha.';
+        shortCpfMsg = 'Credenciais inválidas';
+        shortPasswordMsg = null;
       } else if (normalized.contains('invalid credentials') ||
           normalized.contains('invalid login credentials') ||
           normalized.contains('authapi')) {
@@ -328,16 +333,19 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: Stack(
-          children: [
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: SafeArea(
+          child: Stack(
+            children: [
             Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32.0,
-                    vertical: 24.0,
+                    vertical: 12.0,
                   ),
                   child: SingleChildScrollView(
                     child: Form(
@@ -517,8 +525,9 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class RegisterPage extends StatefulWidget {
@@ -639,6 +648,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _estadoModoDigitacao = false;
   bool _municipioModoDigitacao = false;
   bool _ubsModoDigitacao = false;
+  final _scrollController = ScrollController();
   List<EstadoBrasileiro> _estadosFiltrados = estadosBrasileiros;
 
   bool _isLoading = false;
@@ -702,13 +712,6 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void initState() {
     super.initState();
-    _cpfController.text = '071.618.221-14';
-    _passwordController.text = '000000';
-    _confirmPasswordController.text = '000000';
-    _nameController.text = 'Allan Batista';
-    _birthDateController.text = '16/01/2001';
-    _phoneController.text = '(63) 99103-6533';
-    _emailController.text = 'allanbatista2001@gmail.com';
 
     _estadoController.addListener(_onEstadoChanged);
     _estadoFocusNode.addListener(_onEstadoFocusChanged);
@@ -778,6 +781,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _logradouroFocusNode.dispose();
     _numeroFocusNode.dispose();
     _bairroFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -797,7 +801,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _focusFirstInvalidField() {
-    if (_currentStep == 0) {
+    if (_currentStep == 2) {
       final cpfDigits = _cpfController.text.replaceAll(RegExp(r'\D'), '');
       if (cpfDigits.length != 11) {
         _cpfFocusNode.requestFocus();
@@ -813,14 +817,14 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     }
 
-    if (_currentStep == 1) {
+    if (_currentStep == 0) {
+      // 1. Dados Pessoais
       final name = _nameController.text.trim();
       if (name.length < 3) {
         _nameFocusNode.requestFocus();
         return;
       }
 
-      // Validação de foco para Data de Nascimento
       final birthText = _birthDateController.text;
       bool dateHasError = false;
       if (birthText.length < 10) {
@@ -852,8 +856,13 @@ class _RegisterPageState extends State<RegisterPage> {
       final gender = _genderController.text.trim();
       if (gender.isEmpty) {
         _genderFocusNode.requestFocus();
-        // Foca e já abre o dropdown para facilitar ao usuário
         _toggleDropdownGenero();
+        return;
+      }
+
+      final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+      if (phone.length < 10) {
+        _phoneFocusNode.requestFocus();
         return;
       }
 
@@ -866,20 +875,15 @@ class _RegisterPageState extends State<RegisterPage> {
         }
       }
 
+      // 2. Condições de Saúde
       if (_selectedConditions.isEmpty) {
         _conditionFocusNode.requestFocus();
         _toggleDropdownCondicao();
         return;
       }
 
+      // 3. Contato de Emergência
       if (_hasPartialEmergencyContact()) {
-        final rel = _emergencyRelationshipController.text.trim();
-        if (rel.isEmpty) {
-          _emergencyRelationshipFocusNode.requestFocus();
-          _toggleDropdownParentesco();
-          return;
-        }
-
         final ename = _emergencyNameController.text.trim();
         if (ename.isEmpty) {
           _emergencyNameFocusNode.requestFocus();
@@ -894,10 +898,18 @@ class _RegisterPageState extends State<RegisterPage> {
           _emergencyPhoneFocusNode.requestFocus();
           return;
         }
+
+        final rel = _emergencyRelationshipController.text.trim();
+        if (rel.isEmpty) {
+          _emergencyRelationshipFocusNode.requestFocus();
+          _toggleDropdownParentesco();
+          return;
+        }
       }
     }
 
-    if (_currentStep == 2) {
+    if (_currentStep == 1) {
+      // 4. Endereço
       final cepDigits = _cepController.text.replaceAll(RegExp(r'\D'), '');
       if (cepDigits.length != 8) {
         _cepFocusNode.requestFocus();
@@ -921,6 +933,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
       if (_municipioSelecionado == null) {
         _municipioFocusNode.requestFocus();
+        return;
       }
     }
   }
@@ -1239,12 +1252,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  void _abrirDropdownUbs() {
-    if (!_ubsDropdownAberto) {
-      setState(() => _ubsDropdownAberto = true);
-      _ubsOverlayController.show();
-    }
-  }
 
   void _fecharDropdownUbs() {
     if (_ubsDropdownAberto) {
@@ -1407,12 +1414,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return (Offset(offset.dx, offset.dy + box.size.height + 4), box.size.width);
   }
 
-  void _abrirDropdownParentesco() {
-    if (!_relationshipDropdownAberto) {
-      setState(() => _relationshipDropdownAberto = true);
-      _relationshipOverlayController.show();
-    }
-  }
 
   void _fecharDropdownParentesco() {
     if (_relationshipDropdownAberto) {
@@ -1459,16 +1460,6 @@ class _RegisterPageState extends State<RegisterPage> {
     _fecharDropdownParentesco();
   }
 
-  (Offset, double) _calcularPosicaoDropdownParentesco() {
-    final box =
-        _relationshipFieldKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return (Offset.zero, 300);
-    final offset = box.localToGlobal(Offset.zero);
-    return (
-      Offset(offset.dx, offset.dy + box.size.height + 4.0),
-      box.size.width,
-    );
-  }
 
   ({double top, double width, double maxHeight})
   _calcularDropdownParentescoLayout(BuildContext context) {
@@ -1538,128 +1529,12 @@ class _RegisterPageState extends State<RegisterPage> {
           key: _stepKeys[0],
           child: Column(
             children: [
-              TextFormField(
-                controller: _cpfController,
-                focusNode: _cpfFocusNode,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(12),
-                  CpfInputFormatter(),
-                ],
-                decoration: AppInputDecoration.build(
-                  context,
-                  labelText: 'CPF',
-                  hintText: '000.000.000-00',
-                  prefixIcon: Icon(
-                    Icons.badge_outlined,
-                    color: colorScheme.primary,
-                  ),
-                ).copyWith(errorText: _cpfBackendError),
-                onChanged: (v) {
-                  if (_cpfBackendError != null) {
-                    setState(() => _cpfBackendError = null);
-                  }
-                },
-                validator: (value) {
-                  if (_cpfBackendError != null) return _cpfBackendError;
-                  final v = value?.replaceAll(RegExp(r'\D'), '') ?? '';
-                  if (v.length != 11) return 'Informe um CPF com 11 dígitos';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                focusNode: _passwordFocusNode,
-                obscureText: !_showPassword,
-                decoration: AppInputDecoration.build(
-                  context,
-                  labelText: 'Senha',
-                  prefixIcon: Icon(
-                    Icons.lock_outline,
-                    color: colorScheme.primary,
-                  ),
-                  suffixIcon: IconButton(
-                    tooltip: _showPassword ? 'Ocultar senha' : 'Ver senha',
-                    icon: Icon(
-                      _showPassword ? Icons.visibility_off : Icons.visibility,
-                    ),
-                    onPressed: () =>
-                        setState(() => _showPassword = !_showPassword),
-                  ),
-                ),
-                validator: (value) {
-                  if ((value ?? '').length < 6)
-                    return 'Use pelo menos 6 caracteres';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _confirmPasswordController,
-                focusNode: _confirmPasswordFocusNode,
-                obscureText: !_showConfirmPassword,
-                decoration: AppInputDecoration.build(
-                  context,
-                  labelText: 'Confirmar senha',
-                  prefixIcon: Icon(
-                    Icons.lock_outline,
-                    color: colorScheme.primary,
-                  ),
-                  suffixIcon: IconButton(
-                    tooltip: _showConfirmPassword
-                        ? 'Ocultar senha'
-                        : 'Ver senha',
-                    icon: Icon(
-                      _showConfirmPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-                    onPressed: () => setState(
-                      () => _showConfirmPassword = !_showConfirmPassword,
-                    ),
-                  ),
-                ),
-                validator: (value) {
-                  if (value != _passwordController.text) {
-                    return 'As senhas não coincidem';
-                  }
-                  return null;
-                },
-              ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: _isLoading ? null : _handleCancel,
-                    child: Text(_currentStep == 0 ? 'Cancelar' : 'Voltar'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _isLoading ? null : _handleContinue,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            _currentStep == 2
-                                ? 'Finalizar cadastro'
-                                : 'Continuar',
-                          ),
-                  ),
-                ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Dados pessoais', style: textTheme.titleSmall),
               ),
-            ],
-          ),
-        );
-      case 1:
-        return Form(
-          key: _stepKeys[1],
-          child: Column(
-            children: [
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
                 focusNode: _nameFocusNode,
@@ -1670,6 +1545,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 validator: (v) => (v == null || v.trim().length < 3)
                     ? 'Informe seu nome'
                     : null,
+                enabled: !_isLoading,
+                onChanged: (v) => setState(() {}),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -1708,6 +1585,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   LengthLimitingTextInputFormatter(9),
                   DateInputFormatter(),
                 ],
+                enabled: !_isLoading && _nameController.text.trim().length >= 3,
+                onChanged: (v) => setState(() {}),
               ),
               const SizedBox(height: 16),
               OverlayPortal(
@@ -1791,9 +1670,49 @@ class _RegisterPageState extends State<RegisterPage> {
                             },
                           ),
                   ),
+                  enabled:
+                      !_isLoading && _birthDateController.text.length == 10,
+                  onChanged: (v) => setState(() {}),
                 ),
               ),
               const SizedBox(height: 16),
+              TextFormField(
+                controller: _phoneController,
+                focusNode: _phoneFocusNode,
+                decoration: AppInputDecoration.build(
+                  context,
+                  labelText: 'Telefone',
+                  hintText: '(00) 00000-0000',
+                ),
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(12),
+                  PhoneInputFormatter(),
+                ],
+                enabled: !_isLoading && _genderDisplayController.text.isNotEmpty,
+                onChanged: (v) => setState(() {}),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _emailController,
+                focusNode: _emailFocusNode,
+                decoration: AppInputDecoration.build(
+                  context,
+                  labelText: 'Email de contato',
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return null;
+                  final emailRegex = RegExp(r'^.+@.+\..+$');
+                  return emailRegex.hasMatch(v) ? null : 'Email inválido';
+                },
+                enabled: !_isLoading &&
+                    _phoneController.text.replaceAll(RegExp(r'\D'), '').length >=
+                        10,
+                onChanged: (v) => setState(() {}),
+              ),
+              const SizedBox(height: 32),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text('Condições de saúde', style: textTheme.titleSmall),
@@ -1838,6 +1757,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     }
                     return null;
                   },
+                  enabled: !_isLoading &&
+                      _phoneController.text.replaceAll(RegExp(r'\D'), '').length >=
+                          10,
                   decoration: AppInputDecoration.build(
                     context,
                     labelText: 'Selecionar condição',
@@ -1873,45 +1795,14 @@ class _RegisterPageState extends State<RegisterPage> {
                               setState(() {
                                 _selectedConditions.remove(condition);
                               });
-                              _stepKeys[1].currentState?.validate();
+                              _stepKeys[0].currentState?.validate();
                             },
                           ),
                         )
                         .toList(),
                   ),
                 ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _phoneController,
-                focusNode: _phoneFocusNode,
-                decoration: AppInputDecoration.build(
-                  context,
-                  labelText: 'Telefone',
-                  hintText: '(00) 00000-0000',
-                ),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(12),
-                  PhoneInputFormatter(),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                focusNode: _emailFocusNode,
-                decoration: AppInputDecoration.build(
-                  context,
-                  labelText: 'Email de contato',
-                ),
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return null;
-                  final emailRegex = RegExp(r'^.+@.+\..+$');
-                  return emailRegex.hasMatch(v) ? null : 'Email inválido';
-                },
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -1928,14 +1819,17 @@ class _RegisterPageState extends State<RegisterPage> {
                       _hasPartialEmergencyContact() ||
                       _emergencyPhoneController.text.isNotEmpty ||
                       _emergencyRelationshipController.text.isNotEmpty;
-                  if (anyFilled && (v == null || v.trim().isEmpty))
+                  if (anyFilled && (v == null || v.trim().isEmpty)) {
                     return 'Informe o nome de contato';
+                  }
                   return null;
                 },
                 decoration: AppInputDecoration.build(
                   context,
                   labelText: 'Nome do contato',
                 ),
+                enabled: !_isLoading && _selectedConditions.isNotEmpty,
+                onChanged: (v) => setState(() {}),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -1964,6 +1858,9 @@ class _RegisterPageState extends State<RegisterPage> {
                   LengthLimitingTextInputFormatter(12),
                   PhoneInputFormatter(),
                 ],
+                enabled: !_isLoading &&
+                    _emergencyNameController.text.trim().isNotEmpty,
+                onChanged: (v) => setState(() {}),
               ),
               const SizedBox(height: 12),
               OverlayPortal(
@@ -1972,12 +1869,11 @@ class _RegisterPageState extends State<RegisterPage> {
                   final layout = _calcularDropdownParentescoLayout(context);
                   final mq = MediaQuery.of(context);
                   return Positioned(
-                    left:
-                        (_relationshipFieldKey.currentContext
-                                    ?.findRenderObject()
-                                as RenderBox?)
-                            ?.localToGlobal(Offset.zero)
-                            .dx ??
+                    left: (_relationshipFieldKey.currentContext
+                                 ?.findRenderObject()
+                             as RenderBox?)
+                        ?.localToGlobal(Offset.zero)
+                        .dx ??
                         0,
                     top: layout.top,
                     width: layout.width,
@@ -2005,8 +1901,9 @@ class _RegisterPageState extends State<RegisterPage> {
                         _hasPartialEmergencyContact() ||
                         _emergencyNameController.text.isNotEmpty ||
                         _emergencyPhoneController.text.isNotEmpty;
-                    if (anyFilled && (v == null || v.trim().isEmpty))
+                    if (anyFilled && (v == null || v.trim().isEmpty)) {
                       return 'Informe o parentesco';
+                    }
                     return null;
                   },
                   decoration: AppInputDecoration.build(
@@ -2038,14 +1935,16 @@ class _RegisterPageState extends State<RegisterPage> {
                             onPressed: _toggleDropdownParentesco,
                           ),
                   ),
+                  enabled: !_isLoading &&
+                      _emergencyPhoneController.text.length >= 14,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Row(
                 children: [
                   TextButton(
                     onPressed: _isLoading ? null : _handleCancel,
-                    child: Text(_currentStep == 0 ? 'Cancelar' : 'Voltar'),
+                    child: const Text('Cancelar'),
                   ),
                   const Spacer(),
                   FilledButton(
@@ -2056,23 +1955,24 @@ class _RegisterPageState extends State<RegisterPage> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(
-                            _currentStep == 2
-                                ? 'Finalizar cadastro'
-                                : 'Continuar',
-                          ),
+                        : const Text('Próximo'),
                   ),
                 ],
               ),
             ],
           ),
         );
-      case 2:
-      default:
+      case 1:
         return Form(
-          key: _stepKeys[2],
+          key: _stepKeys[1],
           child: Column(
             children: [
+              const SizedBox(height: 24),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Endereço', style: textTheme.titleSmall),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _cepController,
                 focusNode: _cepFocusNode,
@@ -2121,6 +2021,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   if (v.length != 8) return 'Informe um CEP válido';
                   return null;
                 },
+                enabled: !_isLoading,
               ),
               if (_erroCep != null) ...[
                 const SizedBox(height: 8),
@@ -2149,6 +2050,10 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
+                enabled: !_isLoading &&
+                    _cepController.text.replaceAll(RegExp(r'\D'), '').length ==
+                        8,
+                onChanged: (v) => setState(() {}),
                 validator: (value) {
                   if ((value ?? '').trim().isEmpty) {
                     return 'Informe o logradouro';
@@ -2170,6 +2075,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
+                enabled: !_isLoading &&
+                    _logradouroController.text.trim().isNotEmpty,
+                onChanged: (v) => setState(() {}),
                 validator: (value) {
                   if ((value ?? '').trim().isEmpty) {
                     return 'Informe o número';
@@ -2189,6 +2097,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
+                enabled: !_isLoading &&
+                    _numeroController.text.trim().isNotEmpty,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -2203,6 +2113,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
+                enabled: !_isLoading &&
+                    _numeroController.text.trim().isNotEmpty,
+                onChanged: (v) => setState(() {}),
                 validator: (value) {
                   if ((value ?? '').trim().isEmpty) {
                     return 'Informe o bairro';
@@ -2242,6 +2155,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   focusNode: _estadoFocusNode,
                   readOnly: !_estadoModoDigitacao,
                   onTap: _onEstadoTap,
+                  enabled: !_isLoading &&
+                      _bairroController.text.trim().isNotEmpty,
                   validator: (v) {
                     if (_estadoSelecionado == null) return 'Informe a UF';
                     return null;
@@ -2545,12 +2460,12 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ],
               ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Row(
                 children: [
                   TextButton(
-                    onPressed: _isLoading ? null : _handleCancel,
-                    child: Text(_currentStep == 0 ? 'Cancelar' : 'Voltar'),
+                    onPressed: _isLoading ? null : () => setState(() => _currentStep = 0),
+                    child: const Text('Voltar'),
                   ),
                   const Spacer(),
                   FilledButton(
@@ -2561,19 +2476,150 @@ class _RegisterPageState extends State<RegisterPage> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(
-                            _currentStep == 2
-                                ? 'Finalizar cadastro'
-                                : 'Continuar',
-                          ),
+                        : const Text('Próximo'),
                   ),
                 ],
               ),
             ],
           ),
         );
+      case 2:
+        return Form(
+          key: _stepKeys[2],
+          child: Column(
+            children: [
+              const SizedBox(height: 24),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Dados de acesso', style: textTheme.titleSmall),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _cpfController,
+                focusNode: _cpfFocusNode,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(12),
+                  CpfInputFormatter(),
+                ],
+                decoration: AppInputDecoration.build(
+                  context,
+                  labelText: 'CPF',
+                  hintText: '000.000.000-00',
+                  prefixIcon: Icon(
+                    Icons.badge_outlined,
+                    color: colorScheme.primary,
+                  ),
+                ).copyWith(errorText: _cpfBackendError),
+                onChanged: (v) {
+                  setState(() {
+                    if (_cpfBackendError != null) _cpfBackendError = null;
+                  });
+                },
+                validator: (value) {
+                  if (_cpfBackendError != null) {
+                    return _cpfBackendError;
+                  }
+                  final v = value?.replaceAll(RegExp(r'\D'), '') ?? '';
+                  if (v.length != 11) return 'Informe um CPF com 11 dígitos';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                focusNode: _passwordFocusNode,
+                obscureText: !_showPassword,
+                decoration: AppInputDecoration.build(
+                  context,
+                  labelText: 'Senha',
+                  prefixIcon: Icon(
+                    Icons.lock_outline,
+                    color: colorScheme.primary,
+                  ),
+                  suffixIcon: IconButton(
+                    tooltip: _showPassword ? 'Ocultar senha' : 'Ver senha',
+                    icon: Icon(
+                      _showPassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showPassword = !_showPassword),
+                  ),
+                ),
+                enabled: !_isLoading &&
+                    _cpfController.text.replaceAll(RegExp(r'\D'), '').length ==
+                        11,
+                onChanged: (v) => setState(() {}),
+                validator: (value) {
+                  if ((value ?? '').length < 6) {
+                    return 'Use pelo menos 6 caracteres';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmPasswordController,
+                focusNode: _confirmPasswordFocusNode,
+                obscureText: !_showConfirmPassword,
+                decoration: AppInputDecoration.build(
+                  context,
+                  labelText: 'Confirmar senha',
+                  prefixIcon: Icon(
+                    Icons.lock_outline,
+                    color: colorScheme.primary,
+                  ),
+                  suffixIcon: IconButton(
+                    tooltip: _showConfirmPassword ? 'Ocultar senha' : 'Ver senha',
+                    icon: Icon(
+                      _showConfirmPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () => setState(
+                      () => _showConfirmPassword = !_showConfirmPassword,
+                    ),
+                  ),
+                ),
+                enabled: !_isLoading && _passwordController.text.length >= 6,
+                onChanged: (v) => setState(() {}),
+                validator: (value) {
+                  if (value != _passwordController.text) {
+                    return 'As senhas não coincidem';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: _isLoading ? null : () => setState(() => _currentStep = 1),
+                    child: const Text('Voltar'),
+                  ),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: _isLoading ? null : _handleContinue,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Finalizar cadastro'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      default:
+        return const SizedBox.shrink();
     }
   }
+
+
 
   Future<void> _submit() async {
     final app = context.read<AppState>();
@@ -2608,7 +2654,7 @@ class _RegisterPageState extends State<RegisterPage> {
       final msg = _extractErrorMessage(e);
       if (msg.toLowerCase().contains('cpf')) {
         setState(() {
-          _currentStep = 0;
+          _currentStep = 2; // Access is now Step 2
           _cpfBackendError = 'CPF já cadastrado';
         });
         _showErrorSnackBar(msg);
@@ -2631,7 +2677,17 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    if (_currentStep == 0) {
+    if (_currentStep == 0 || _currentStep == 1) {
+      setState(() => _currentStep++);
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      return;
+    }
+
+    if (_currentStep == 2) {
       final app = context.read<AppState>();
       setState(() => _isLoading = true);
       try {
@@ -2647,6 +2703,7 @@ class _RegisterPageState extends State<RegisterPage> {
           _cpfFocusNode.requestFocus();
           return;
         }
+        await _submit();
       } catch (e) {
         if (!mounted) return;
         final msg = _extractErrorMessage(e);
@@ -2655,18 +2712,10 @@ class _RegisterPageState extends State<RegisterPage> {
         });
         _showErrorSnackBar(msg);
         _cpfFocusNode.requestFocus();
-        return;
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
     }
-
-    if (_currentStep < 2) {
-      setState(() => _currentStep++);
-      return;
-    }
-
-    await _submit();
   }
 
   void _handleCancel() {
@@ -2700,39 +2749,47 @@ class _RegisterPageState extends State<RegisterPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
       child: Scaffold(
-      appBar: AppBar(title: const Text('Cadastro')),
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24.0,
-                  vertical: 16.0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          FocusScope.of(context).unfocus();
-                          _fecharDropdownEstado();
-                          _fecharDropdownMunicipio();
-                          _fecharDropdownGenero();
-                          _fecharDropdownCondicao();
-                          _fecharDropdownParentesco();
-                        },
+        appBar: AppBar(title: const Text('Cadastro')),
+        body: GestureDetector(
+          onTap: () {
+            FocusScope.of(context).unfocus();
+            _fecharDropdownEstado();
+            _fecharDropdownMunicipio();
+            _fecharDropdownGenero();
+            _fecharDropdownCondicao();
+            _fecharDropdownParentesco();
+          },
+          behavior: HitTestBehavior.opaque,
+          child: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 16.0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 8),
+                      Expanded(
                         child: SingleChildScrollView(
+                          controller: _scrollController,
                           child: Column(
                             children: [
                               _buildStepContent(colorScheme, textTheme),
                               SizedBox(
-                                // Calcula a altura somando o tamanho aproximado de cada item (48px)
                                 height: _relationshipDropdownAberto
                                     ? (_relationshipOptions.length * 44.0)
                                     : 0.0,
@@ -2741,8 +2798,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2750,7 +2807,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       ),
     );
-  }
+}
 }
 
 class _DropdownString extends StatelessWidget {

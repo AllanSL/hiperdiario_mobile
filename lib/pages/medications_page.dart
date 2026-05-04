@@ -127,7 +127,9 @@ class _MedicationTile extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: isDisabled ? Theme.of(context).colorScheme.surfaceContainerHighest : null,
+      color: isDisabled
+          ? Theme.of(context).colorScheme.surfaceContainerHighest
+          : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
@@ -153,9 +155,7 @@ class _MedicationTile extends StatelessWidget {
                         Flexible(
                           child: Text(
                             m.name,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -204,16 +204,17 @@ class _MedicationTile extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.primaryContainer,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
                               duration: const Duration(seconds: 2),
                               content: Row(
                                 children: [
                                   Icon(
                                     Icons.check_circle_outline,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimaryContainer,
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -222,9 +223,9 @@ class _MedicationTile extends StatelessWidget {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onPrimaryContainer,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                   ),
@@ -233,7 +234,8 @@ class _MedicationTile extends StatelessWidget {
                             ),
                           );
                         }
-                      } else if (value == 'delete' && m.dispensationId == null) {
+                      } else if (value == 'delete' &&
+                          m.dispensationId == null) {
                         final confirmed = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
@@ -246,8 +248,9 @@ class _MedicationTile extends StatelessWidget {
                               ),
                               FilledButton(
                                 style: FilledButton.styleFrom(
-                                  backgroundColor:
-                                      Theme.of(ctx).colorScheme.error,
+                                  backgroundColor: Theme.of(
+                                    ctx,
+                                  ).colorScheme.error,
                                 ),
                                 onPressed: () => Navigator.of(ctx).pop(true),
                                 child: const Text('Excluir'),
@@ -342,11 +345,11 @@ class _MedicationTile extends StatelessWidget {
                       Chip(
                         label: Text('Estoque baixo'),
                         backgroundColor: colorScheme.errorContainer,
-                        labelStyle:
-                            Theme.of(context).textTheme.labelLarge?.copyWith(
-                                  color: colorScheme.onErrorContainer,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        labelStyle: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(
+                              color: colorScheme.onErrorContainer,
+                              fontWeight: FontWeight.w600,
+                            ),
                         side: BorderSide(
                           color: colorScheme.error.withValues(alpha: 0.4),
                         ),
@@ -357,11 +360,13 @@ class _MedicationTile extends StatelessWidget {
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     Chip(
-                      label: Text(m.stockUnits > 0 ? 'Estoque: ${m.stockUnits}' : 'Sem estoque'),
+                      label: Text(
+                        m.stockUnits > 0
+                            ? 'Estoque: ${m.stockUnits}'
+                            : 'Sem estoque',
+                      ),
                       backgroundColor: colorScheme.primaryContainer,
-                      labelStyle: Theme.of(context)
-                          .textTheme
-                          .labelLarge
+                      labelStyle: Theme.of(context).textTheme.labelLarge
                           ?.copyWith(color: colorScheme.onPrimaryContainer),
                       side: BorderSide(
                         color: colorScheme.primary.withValues(alpha: 0.4),

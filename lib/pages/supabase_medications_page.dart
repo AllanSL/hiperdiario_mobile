@@ -7,7 +7,8 @@ class SupabaseMedicationsPage extends StatefulWidget {
   const SupabaseMedicationsPage({super.key});
 
   @override
-  State<SupabaseMedicationsPage> createState() => _SupabaseMedicationsPageState();
+  State<SupabaseMedicationsPage> createState() =>
+      _SupabaseMedicationsPageState();
 }
 
 class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
@@ -29,12 +30,16 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
   Future<void> _showEditDialog({Map<String, dynamic>? item}) async {
     final nameController = TextEditingController(text: item?['name'] ?? '');
     final brandController = TextEditingController(text: item?['brand'] ?? '');
-    final stockController = TextEditingController(text: (item?['stock'] ?? '').toString());
+    final stockController = TextEditingController(
+      text: (item?['stock'] ?? '').toString(),
+    );
 
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(item == null ? 'Adicionar medicamento' : 'Editar medicamento'),
+        title: Text(
+          item == null ? 'Adicionar medicamento' : 'Editar medicamento',
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -48,13 +53,19 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
             ),
             TextField(
               controller: stockController,
-              decoration: AppInputDecoration.build(ctx, labelText: 'Estoque (nº)'),
+              decoration: AppInputDecoration.build(
+                ctx,
+                labelText: 'Estoque (nº)',
+              ),
               keyboardType: TextInputType.number,
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             onPressed: () async {
               final name = nameController.text.trim();
@@ -80,7 +91,9 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
                 Navigator.of(ctx).pop(true);
               } catch (e) {
                 Navigator.of(ctx).pop(false);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erro: ${e.toString()}')),
+                );
               }
             },
             child: const Text('Salvar'),
@@ -99,8 +112,14 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
         title: const Text('Confirmar'),
         content: const Text('Deseja remover este medicamento?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Remover')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remover'),
+          ),
         ],
       ),
     );
@@ -109,13 +128,19 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
     try {
       final success = await repo.deleteMedication(id);
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Removido')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Removido')));
         _load();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível remover')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível remover')),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
     }
   }
 
@@ -131,10 +156,12 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (snap.connectionState == ConnectionState.waiting)
+            return const Center(child: CircularProgressIndicator());
           if (snap.hasError) return Center(child: Text('Erro: ${snap.error}'));
           final meds = snap.data ?? [];
-          if (meds.isEmpty) return const Center(child: Text('Nenhum medicamento encontrado'));
+          if (meds.isEmpty)
+            return const Center(child: Text('Nenhum medicamento encontrado'));
           return ListView.separated(
             itemCount: meds.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
@@ -143,13 +170,16 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
               return ListTile(
                 title: Text(m['name'] ?? '—'),
                 subtitle: Text(m['brand'] ?? ''),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text((m['stock'] ?? 0).toString()),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _deleteItem(m['id'] as int),
-                  ),
-                ]),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text((m['stock'] ?? 0).toString()),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _deleteItem(m['id'] as int),
+                    ),
+                  ],
+                ),
                 onTap: () => _showEditDialog(item: m),
               );
             },

@@ -73,13 +73,23 @@ class CnesEstabelecimento {
 
 /// Representa um profissional de saúde retornado pela API CNES.
 class CnesProfissional {
+  final String? id; // Supabase UUID
   final String nome;
   final String especialidade;
 
   const CnesProfissional({
+    this.id,
     required this.nome,
     required this.especialidade,
   });
+
+  CnesProfissional copyWith({String? id, String? nome, String? especialidade}) {
+    return CnesProfissional(
+      id: id ?? this.id,
+      nome: nome ?? this.nome,
+      especialidade: especialidade ?? this.especialidade,
+    );
+  }
 
   /// Texto exibido no campo de texto após selecionar a opção.
   String get displayText => '$especialidade - $nome';
@@ -92,11 +102,12 @@ class CnesProfissional {
       identical(this, other) ||
       other is CnesProfissional &&
           runtimeType == other.runtimeType &&
+          id == other.id &&
           nome == other.nome &&
           especialidade == other.especialidade;
 
   @override
-  int get hashCode => nome.hashCode ^ especialidade.hashCode;
+  int get hashCode => id.hashCode ^ nome.hashCode ^ especialidade.hashCode;
 }
 
 /// Serviço para consulta à API de Dados Abertos do CNES (Cadastro Nacional de Estabelecimentos de Saúde) e Edge Function Supabase.
@@ -129,8 +140,56 @@ class CnesService {
     return null;
   }
 
-  /// Busca os profissionais consultando diretamente a API do CNES com headers específicos.
-  static Future<List<CnesProfissional>> buscarProfissionais(int ibge7Digitos, int cnes7Digitos) async {
+  /// Busca a lista COMPLETA de profissionais no CNES e enriquece com o ID do Supabase
+  /// para aqueles que possuem cadastro no sistema (login).
+  static Future<List<CnesProfissional>> buscarProfissionais(
+    int ibge7Digitos,
+    int cnes7Digitos,
+  ) async {
+    // 1. Busca todos os profissionais da Unidade via API do CNES
+    final listaCnes = await buscarProfissionaisCnes(ibge7Digitos, cnes7Digitos);
+    if (listaCnes.isEmpty) return [];
+
+    try {
+      // 2. Busca os profissionais que possuem login/cadastro no nosso sistema para esta UBS
+      final response = await _supabase
+          .from('profissionais')
+          .select('id, nome, especialidade')
+          .eq('cnes', cnes7Digitos.toString());
+
+      final cadastrados = response as List<dynamic>;
+
+      // 3. Mescla os dados: se o profissional do CNES existir no nosso banco, anexamos o ID (UUID)
+      final merged = listaCnes.map<CnesProfissional>((pCnes) {
+        final match = cadastrados.firstWhere((pDb) {
+          final nomeDb = (pDb['nome'] as String? ?? '').trim().toLowerCase();
+          final espDb = (pDb['especialidade'] as String? ?? '')
+              .trim()
+              .toLowerCase();
+          return nomeDb == pCnes.nome.toLowerCase() &&
+              espDb == pCnes.especialidade.toLowerCase();
+        }, orElse: () => null);
+
+        if (match != null) {
+          return pCnes.copyWith(id: match['id']?.toString());
+        }
+        return pCnes;
+      }).toList();
+
+      merged.sort((a, b) => a.displayText.compareTo(b.displayText));
+      return merged;
+    } catch (e) {
+      debugPrint('[CnesService] Erro ao cruzar dados com Supabase: $e');
+      listaCnes.sort((a, b) => a.displayText.compareTo(b.displayText));
+      return listaCnes;
+    }
+  }
+
+  /// Busca os profissionais consultando diretamente a API do CNES (Legado/Referência).
+  static Future<List<CnesProfissional>> buscarProfissionaisCnes(
+    int ibge7Digitos,
+    int cnes7Digitos,
+  ) async {
     try {
       String ibgeStr = ibge7Digitos.toString();
       if (ibgeStr.length == 7) {
@@ -142,7 +201,9 @@ class CnesService {
 
       // Obtém um cookie de sessão válido simulando o acesso à página principal
       final mainPageResponse = await _getWithRetry(
-        Uri.parse('https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp'),
+        Uri.parse(
+          'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
+        ),
         {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
@@ -152,9 +213,12 @@ class CnesService {
 
       final cookies = mainPageResponse.headers['set-cookie'] ?? '';
 
-      final uri = Uri.parse('https://cnes.datasus.gov.br/services/estabelecimentos-profissionais/$id');
+      final uri = Uri.parse(
+        'https://cnes.datasus.gov.br/services/estabelecimentos-profissionais/$id',
+      );
       final response = await _getWithRetry(uri, {
-        'Referer': 'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
+        'Referer':
+            'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
         'Accept': 'application/json',
@@ -183,7 +247,7 @@ class CnesService {
               cbo.contains('GINECOLOGISTA') ||
               cbo.contains('FISIOTERAPEUTA')) {
             cbo = cbo.replaceAll('CIRURGIAODENTISTA', 'CIRURGIÃO DENTISTA');
-            cbo = cbo.replaceAll('CIRURGIAO DENTISTA', 'CIRURGIÃO DENTISTA');
+            cbo = cbo.replaceAll('CIRURGIO DENTISTA', 'CIRURGIÃO DENTISTA');
             cbo = cbo.replaceAll(RegExp(r'\s+'), ' ').trim();
 
             if (cbo.startsWith('MEDICO ')) {
@@ -193,10 +257,7 @@ class CnesService {
               cbo = cbo.replaceFirst('PSICOLOGO ', 'PSICÓLOGO ');
             }
 
-            profissionais.add(CnesProfissional(
-              nome: nome,
-              especialidade: cbo,
-            ));
+            profissionais.add(CnesProfissional(nome: nome, especialidade: cbo));
           }
         }
 
@@ -206,7 +267,7 @@ class CnesService {
       }
       return [];
     } catch (e) {
-      debugPrint('[CnesService] Exception ao buscar profissionais: $e');
+      debugPrint('[CnesService] Exception ao buscar profissionais Cnes: $e');
       return [];
     }
   }
@@ -214,7 +275,10 @@ class CnesService {
   static final SupabaseClient _supabase = Supabase.instance.client;
 
   /// Busca os horários de atendimento consultando diretamente o CNES com headers específicos.
-  static Future<List<dynamic>> buscarHorariosAtendimento(int ibge7Digitos, int cnes7Digitos) async {
+  static Future<List<dynamic>> buscarHorariosAtendimento(
+    int ibge7Digitos,
+    int cnes7Digitos,
+  ) async {
     try {
       String ibgeStr = ibge7Digitos.toString();
       if (ibgeStr.length == 7) {
@@ -226,7 +290,9 @@ class CnesService {
 
       // Obtém um cookie de sessão válido simulando o acesso à página principal
       final mainPageResponse = await _getWithRetry(
-        Uri.parse('https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp'),
+        Uri.parse(
+          'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
+        ),
         {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
@@ -236,9 +302,12 @@ class CnesService {
 
       final cookies = mainPageResponse.headers['set-cookie'] ?? '';
 
-      final uri = Uri.parse('https://cnes.datasus.gov.br/services/estabelecimentos/atendimento/$id');
+      final uri = Uri.parse(
+        'https://cnes.datasus.gov.br/services/estabelecimentos/atendimento/$id',
+      );
       final response = await _getWithRetry(uri, {
-        'Referer': 'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
+        'Referer':
+            'https://cnes.datasus.gov.br/pages/estabelecimentos/consulta.jsp',
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
         'Accept': 'application/json',
@@ -314,7 +383,12 @@ class CnesService {
         debugPrint('[CnesService] Estabelecimentos recebidos: ${lista.length}');
 
         final todos = lista
-            .map((e) => CnesEstabelecimento.fromJson(e as Map<String, dynamic>, ibge: codigoMunicipio))
+            .map(
+              (e) => CnesEstabelecimento.fromJson(
+                e as Map<String, dynamic>,
+                ibge: codigoMunicipio,
+              ),
+            )
             .toList();
 
         // Filtra localmente pelo texto digitado (a API não suporta busca por nome)

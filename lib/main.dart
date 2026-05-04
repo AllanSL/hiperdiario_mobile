@@ -14,12 +14,12 @@ import 'core/data/supabase_client.dart';
 /// Build:    flutter build apk
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inicializa timezones
   tz.initializeTimeZones();
   // Define o timezone local (importante para notificações)
   tz.setLocalLocation(tz.getLocation('America/Sao_Paulo'));
-  
+
   await NotificationService.instance.init();
   // Inicializa Supabase (carrega .env e inicializa o cliente). Create a local
   // `.env` file based on `.env.example` with SUPABASE_URL and SUPABASE_ANON_KEY.

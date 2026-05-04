@@ -27,9 +27,7 @@ class HiperDiarioPacienteApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const [
-          Locale('pt', 'BR'),
-        ],
+        supportedLocales: const [Locale('pt', 'BR')],
         // Aplica comportamento de scroll global: sem bounce/alongamento e sem glow
         scrollBehavior: const NoBounceSrollBehavior(),
         home: Consumer<AppState>(

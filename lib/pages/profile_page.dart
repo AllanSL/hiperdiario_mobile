@@ -173,7 +173,7 @@ class ProfilePage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-            _InfoCard(
+        _InfoCard(
           rows: [
             _InfoRow.compact(formatPhoneDisplay(p.contact), icon: Icons.phone),
             if (p.email != null && p.email!.isNotEmpty)
@@ -1481,7 +1481,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
   final _ubsFocusNode = FocusNode();
   final _ubsFieldKey = GlobalKey();
   final _ubsOverlayController = OverlayPortalController();
-  
+
   ModalRoute<dynamic>? _modalRoute;
 
   List<CnesEstabelecimento> _todasUbs = [];
@@ -1568,7 +1568,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
 
         // Se já tivermos um código cnes (p.ubs) e acabarmos de carregar as UBSs,
         // substituímos o texto pelo nome fantasia da UBS encontrada.
-            if (patient?.ubs != null && patient!.ubs.isNotEmpty) {
+        if (patient?.ubs != null && patient!.ubs.isNotEmpty) {
           try {
             final ubsMatcheada = _todasUbs.firstWhere(
               (ubs) => ubs.codigoCnes.toString() == patient.ubs,
@@ -2259,24 +2259,24 @@ class _EditEmergencyContactPageState extends State<EditEmergencyContactPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-        appBar: AppBar(
-          title: const Text('Contato de emergência'),
-          elevation: 0,
-          scrolledUnderElevation: 0.0,
-          surfaceTintColor: Colors.transparent,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          shadowColor: Colors.transparent,
-        ),
-        body: GestureDetector(
-          onTap: () {
-            FocusScope.of(context).unfocus();
-            _fecharDropdownParentesco();
-          },
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
+      appBar: AppBar(
+        title: const Text('Contato de emergência'),
+        elevation: 0,
+        scrolledUnderElevation: 0.0,
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shadowColor: Colors.transparent,
+      ),
+      body: GestureDetector(
+        onTap: () {
+          FocusScope.of(context).unfocus();
+          _fecharDropdownParentesco();
+        },
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
               const SizedBox(height: 8),
               Text(
                 'Contato de emergência (opcional)',

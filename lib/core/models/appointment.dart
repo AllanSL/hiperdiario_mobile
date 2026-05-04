@@ -30,15 +30,20 @@ class Appointment {
   final DateTime dateTime;
   final String location;
   final String specialty; // Especialidade (ex: Cardiologia, Clínico Geral)
+  final String? professionalName;
+  final String? professionalId;
   final AppointmentShift shift;
   final String? notes; // Observações opcionais
-  final bool? attended; // null: não ocorreu ainda, true: compareceu, false: faltou
+  final bool?
+  attended; // null: não ocorreu ainda, true: compareceu, false: faltou
 
   Appointment({
     required this.id,
     required this.dateTime,
     required this.location,
     required this.specialty,
+    this.professionalName,
+    this.professionalId,
     this.shift = AppointmentShift.morning,
     this.notes,
     this.attended,
@@ -49,6 +54,8 @@ class Appointment {
     DateTime? dateTime,
     String? location,
     String? specialty,
+    String? professionalName,
+    String? professionalId,
     AppointmentShift? shift,
     String? notes,
     bool? attended,
@@ -58,6 +65,8 @@ class Appointment {
       dateTime: dateTime ?? this.dateTime,
       location: location ?? this.location,
       specialty: specialty ?? this.specialty,
+      professionalName: professionalName ?? this.professionalName,
+      professionalId: professionalId ?? this.professionalId,
       shift: shift ?? this.shift,
       notes: notes ?? this.notes,
       attended: attended ?? this.attended,
