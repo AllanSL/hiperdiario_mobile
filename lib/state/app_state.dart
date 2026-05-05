@@ -904,10 +904,10 @@ class AppState extends ChangeNotifier {
     return Appointment(
       id: (row['remote_id'] ?? row['id']).toString(),
       dateTime: dateTime,
-      location: (row['location'] ?? 'Local não informado').toString(),
+      location: (row['cnes_id'] ?? 'Local não informado').toString(),
       specialty: (row['specialty'] ?? 'Consulta').toString(),
       professionalName: row['professional_name']?.toString(),
-      professionalId: row['professional_id']?.toString(),
+      professionalId: row['professional_cns']?.toString(),
       shift: shiftRaw != null
           ? AppointmentShiftX.fromDb(shiftRaw)
           : (dateTime.hour >= 12
@@ -1071,15 +1071,21 @@ class AppState extends ChangeNotifier {
             .eq('cpf', _patient!.cpf)
             .maybeSingle();
 
+        final estab = await _supabase
+            .from('cnes_establishments')
+            .select('id')
+            .eq('cnes_id', appt.location)
+            .maybeSingle();
+
         if (profile != null) {
           final doc = {
             'remote_id': appt.id,
             'patient_id': profile['id'],
             'date_time': appt.dateTime.toUtc().toIso8601String(),
-            'location': appt.location,
+            'cnes_id': appt.location,
+            'establishment_id': estab?['id'],
             'specialty': appt.specialty,
-            'professional_name': appt.professionalName,
-            'professional_id': appt.professionalId,
+            'professional_cns': appt.professionalId,
             'shift': appt.shift.dbValue,
             'notes': appt.notes,
             'status': appt.attended == true
@@ -1118,12 +1124,18 @@ class AppState extends ChangeNotifier {
             int.tryParse(targetId) != null && targetId.length < 13;
         // Heurstica p/ identificar id sequencial gerado pelo Supabase versus timestamp/UUID
 
+        final estab = await _supabase
+            .from('cnes_establishments')
+            .select('id')
+            .eq('cnes_id', appt.location)
+            .maybeSingle();
+
         final doc = {
           'date_time': appt.dateTime.toUtc().toIso8601String(),
-          'location': appt.location,
+          'cnes_id': appt.location,
+          'establishment_id': estab?['id'],
           'specialty': appt.specialty,
-          'professional_name': appt.professionalName,
-          'professional_id': appt.professionalId,
+          'professional_cns': appt.professionalId,
           'shift': appt.shift.dbValue,
           'notes': appt.notes,
           'status': appt.attended == true

@@ -140,6 +140,15 @@ class CnesService {
     return null;
   }
 
+  static String removeDiacritics(String str) {
+    var withDia = 'ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽž';
+    var withoutDia = 'AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz';
+    for (int i = 0; i < withDia.length; i++) {
+      str = str.replaceAll(withDia[i], withoutDia[i]);
+    }
+    return str;
+  }
+
   /// Busca a lista COMPLETA de profissionais no CNES e enriquece com o ID do Supabase
   /// para aqueles que possuem cadastro no sistema (login).
   static Future<List<CnesProfissional>> buscarProfissionais(
@@ -153,25 +162,28 @@ class CnesService {
     try {
       // 2. Busca os profissionais que possuem login/cadastro no nosso sistema para esta UBS
       final response = await _supabase
-          .from('profissionais')
-          .select('id, nome, especialidade')
+          .from('professionals')
+          .select('cns, nome, especialidade')
           .eq('cnes', cnes7Digitos.toString());
 
       final cadastrados = response as List<dynamic>;
 
       // 3. Mescla os dados: se o profissional do CNES existir no nosso banco, anexamos o ID (UUID)
       final merged = listaCnes.map<CnesProfissional>((pCnes) {
-        final match = cadastrados.firstWhere((pDb) {
-          final nomeDb = (pDb['nome'] as String? ?? '').trim().toLowerCase();
-          final espDb = (pDb['especialidade'] as String? ?? '')
-              .trim()
-              .toLowerCase();
-          return nomeDb == pCnes.nome.toLowerCase() &&
-              espDb == pCnes.especialidade.toLowerCase();
-        }, orElse: () => null);
+        Map<String, dynamic>? match;
+        for (final pDb in cadastrados) {
+          final nomeDb = removeDiacritics((pDb['nome'] as String? ?? '').trim().toLowerCase());
+          final espDb = removeDiacritics((pDb['especialidade'] as String? ?? '').trim().toLowerCase());
+          final nomeCnes = removeDiacritics(pCnes.nome.toLowerCase());
+          final espCnes = removeDiacritics(pCnes.especialidade.toLowerCase());
+          if (nomeDb == nomeCnes && espDb == espCnes) {
+            match = pDb as Map<String, dynamic>;
+            break;
+          }
+        }
 
         if (match != null) {
-          return pCnes.copyWith(id: match['id']?.toString());
+          return pCnes.copyWith(id: match['cns']?.toString());
         }
         return pCnes;
       }).toList();
@@ -234,6 +246,7 @@ class CnesService {
         for (final e in data) {
           String cbo = (e['dsCbo'] as String?)?.trim().toUpperCase() ?? '';
           String nome = (e['nome'] as String?)?.trim() ?? '';
+          String? cns = e['cns']?.toString() ?? e['cnsMaster']?.toString();
 
           if (cbo.isEmpty || nome.isEmpty) continue;
 
@@ -257,7 +270,7 @@ class CnesService {
               cbo = cbo.replaceFirst('PSICOLOGO ', 'PSICÓLOGO ');
             }
 
-            profissionais.add(CnesProfissional(nome: nome, especialidade: cbo));
+            profissionais.add(CnesProfissional(id: cns, nome: nome, especialidade: cbo));
           }
         }
 

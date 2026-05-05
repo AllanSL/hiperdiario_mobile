@@ -339,195 +339,200 @@ class _LoginPageState extends State<LoginPage> {
         child: SafeArea(
           child: Stack(
             children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32.0,
-                    vertical: 12.0,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.favorite,
-                              size: 52,
-                              color: colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'HiperDiário',
-                            style: textTheme.titleLarge?.copyWith(
-                              fontSize: 32,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Entre com CPF e senha para continuar.',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 32),
-                          TextFormField(
-                            controller: _cpfController,
-                            focusNode: _cpfFocusNode,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(12),
-                              CpfInputFormatter(),
-                            ],
-                            decoration: AppInputDecoration.build(
-                              context,
-                              labelText: 'CPF',
-                              hintText: '000.000.000-00',
-                            ).copyWith(errorText: _cpfBackendError),
-                            onChanged: (v) {
-                              if (_cpfBackendError != null) {
-                                setState(() {
-                                  _cpfBackendError = null;
-                                });
-                              }
-                            },
-                            validator: (value) {
-                              if (_cpfBackendError != null)
-                                return _cpfBackendError;
-                              final v =
-                                  value?.replaceAll(RegExp(r'\D'), '') ?? '';
-                              if (v.length != 11)
-                                return 'Informe um CPF com 11 dígitos';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _passwordController,
-                            focusNode: _passwordFocusNode,
-                            obscureText: true,
-                            decoration: AppInputDecoration.build(
-                              context,
-                              labelText: 'Senha',
-                            ).copyWith(errorText: _passwordBackendError),
-                            onChanged: (v) {
-                              if (_passwordBackendError != null) {
-                                setState(() {
-                                  _passwordBackendError = null;
-                                });
-                              }
-                            },
-                            validator: (value) {
-                              if (_passwordBackendError != null)
-                                return _passwordBackendError;
-                              if ((value ?? '').length < 6)
-                                return 'Use pelo menos 6 caracteres';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _isLoading ? null : _submit,
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Entrar'),
-                            ),
-                          ),
-                          const SizedBox(height: 64),
-                          SizedBox(
-                            width: double.infinity,
-                            child: TextButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const RegisterPage(),
-                                      ),
-                                    ),
-                              child: const Text(
-                                'Não tem uma conta?\nCadastre-se',
-                                textAlign: TextAlign.center,
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32.0,
+                      vertical: 12.0,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 96,
+                              height: 96,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.favorite,
+                                size: 52,
+                                color: colorScheme.onPrimaryContainer,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
+                            const SizedBox(height: 24),
+                            Text(
+                              'HiperDiário',
+                              style: textTheme.titleLarge?.copyWith(
+                                fontSize: 32,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Entre com CPF e senha para continuar.',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 32),
+                            TextFormField(
+                              controller: _cpfController,
+                              focusNode: _cpfFocusNode,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(12),
+                                CpfInputFormatter(),
+                              ],
+                              decoration: AppInputDecoration.build(
+                                context,
+                                labelText: 'CPF',
+                                hintText: '000.000.000-00',
+                              ).copyWith(errorText: _cpfBackendError),
+                              onChanged: (v) {
+                                if (_cpfBackendError != null) {
+                                  setState(() {
+                                    _cpfBackendError = null;
+                                  });
+                                }
+                              },
+                              validator: (value) {
+                                if (_cpfBackendError != null)
+                                  return _cpfBackendError;
+                                final v =
+                                    value?.replaceAll(RegExp(r'\D'), '') ?? '';
+                                if (v.length != 11)
+                                  return 'Informe um CPF com 11 dígitos';
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _passwordController,
+                              focusNode: _passwordFocusNode,
+                              obscureText: true,
+                              decoration: AppInputDecoration.build(
+                                context,
+                                labelText: 'Senha',
+                              ).copyWith(errorText: _passwordBackendError),
+                              onChanged: (v) {
+                                if (_passwordBackendError != null) {
+                                  setState(() {
+                                    _passwordBackendError = null;
+                                  });
+                                }
+                              },
+                              validator: (value) {
+                                if (_passwordBackendError != null)
+                                  return _passwordBackendError;
+                                if ((value ?? '').length < 6)
+                                  return 'Use pelo menos 6 caracteres';
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton(
+                                onPressed: _isLoading ? null : _submit,
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Entrar'),
+                              ),
+                            ),
+                            const SizedBox(height: 64),
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
+                                        FocusScope.of(context).unfocus();
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const RegisterPage(),
+                                          ),
+                                        );
+                                      },
+                                child: const Text(
+                                  'Não tem uma conta?\nCadastre-se',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.text_increase),
-                    tooltip: 'Tamanho da Fonte',
-                    onPressed: () {
-                      final currentScale = accessibility.scale;
-                      final currentIndex = AccessibilityScale.values.indexOf(
-                        currentScale,
-                      );
-                      final nextIndex =
-                          (currentIndex + 1) % AccessibilityScale.values.length;
-                      accessibility.setScale(
-                        AccessibilityScale.values[nextIndex],
-                      );
-                    },
-                    style: IconButton.styleFrom(
-                      backgroundColor: colorScheme.surfaceContainerHighest,
-                      foregroundColor: colorScheme.onSurface,
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.text_increase),
+                      tooltip: 'Tamanho da Fonte',
+                      onPressed: () {
+                        final currentScale = accessibility.scale;
+                        final currentIndex = AccessibilityScale.values.indexOf(
+                          currentScale,
+                        );
+                        final nextIndex =
+                            (currentIndex + 1) %
+                            AccessibilityScale.values.length;
+                        accessibility.setScale(
+                          AccessibilityScale.values[nextIndex],
+                        );
+                      },
+                      style: IconButton.styleFrom(
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                        foregroundColor: colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(
-                      themeProvider.isDark(context)
-                          ? Icons.light_mode
-                          : Icons.dark_mode,
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: Icon(
+                        themeProvider.isDark(context)
+                            ? Icons.light_mode
+                            : Icons.dark_mode,
+                      ),
+                      tooltip: 'Alternar Tema',
+                      onPressed: () => themeProvider.toggle(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                        foregroundColor: colorScheme.onSurface,
+                      ),
                     ),
-                    tooltip: 'Alternar Tema',
-                    onPressed: () => themeProvider.toggle(context),
-                    style: IconButton.styleFrom(
-                      backgroundColor: colorScheme.surfaceContainerHighest,
-                      foregroundColor: colorScheme.onSurface,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class RegisterPage extends StatefulWidget {
@@ -1252,7 +1257,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-
   void _fecharDropdownUbs() {
     if (_ubsDropdownAberto) {
       setState(() => _ubsDropdownAberto = false);
@@ -1274,8 +1278,23 @@ class _RegisterPageState extends State<RegisterPage> {
     _ubsFocusNode.unfocus();
   }
 
-  void _onUbsTap() {
-    if (!_ubsModoDigitacao) {
+  Future<void> _onUbsTap({bool fromArrow = false}) async {
+    if (!_ubsDropdownAberto) {
+      if (!fromArrow && !_ubsFocusNode.hasFocus) {
+        _ubsFocusNode.requestFocus();
+      }
+      setState(() => _ubsDropdownAberto = true);
+      await Future.delayed(const Duration(milliseconds: 50));
+      if (_ubsFieldKey.currentContext != null) {
+        await Scrollable.ensureVisible(
+          _ubsFieldKey.currentContext!,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          alignment: 0.1,
+        );
+      }
+      _ubsOverlayController.show();
+    } else if (!_ubsModoDigitacao && !fromArrow) {
       setState(() => _ubsModoDigitacao = true);
       _ubsFocusNode.requestFocus();
     }
@@ -1414,7 +1433,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return (Offset(offset.dx, offset.dy + box.size.height + 4), box.size.width);
   }
 
-
   void _fecharDropdownParentesco() {
     if (_relationshipDropdownAberto) {
       setState(() => _relationshipDropdownAberto = false);
@@ -1437,6 +1455,10 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _toggleDropdownParentesco() async {
+    if (!_emergencyRelationshipFocusNode.hasFocus) {
+      _emergencyRelationshipFocusNode.requestFocus();
+    }
+
     if (_relationshipDropdownAberto) {
       _fecharDropdownParentesco();
       return;
@@ -1459,7 +1481,6 @@ class _RegisterPageState extends State<RegisterPage> {
     });
     _fecharDropdownParentesco();
   }
-
 
   ({double top, double width, double maxHeight})
   _calcularDropdownParentescoLayout(BuildContext context) {
@@ -1690,7 +1711,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   LengthLimitingTextInputFormatter(12),
                   PhoneInputFormatter(),
                 ],
-                enabled: !_isLoading && _genderDisplayController.text.isNotEmpty,
+                enabled:
+                    !_isLoading && _genderDisplayController.text.isNotEmpty,
                 onChanged: (v) => setState(() {}),
               ),
               const SizedBox(height: 16),
@@ -1707,8 +1729,11 @@ class _RegisterPageState extends State<RegisterPage> {
                   final emailRegex = RegExp(r'^.+@.+\..+$');
                   return emailRegex.hasMatch(v) ? null : 'Email inválido';
                 },
-                enabled: !_isLoading &&
-                    _phoneController.text.replaceAll(RegExp(r'\D'), '').length >=
+                enabled:
+                    !_isLoading &&
+                    _phoneController.text
+                            .replaceAll(RegExp(r'\D'), '')
+                            .length >=
                         10,
                 onChanged: (v) => setState(() {}),
               ),
@@ -1757,8 +1782,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     }
                     return null;
                   },
-                  enabled: !_isLoading &&
-                      _phoneController.text.replaceAll(RegExp(r'\D'), '').length >=
+                  enabled:
+                      !_isLoading &&
+                      _phoneController.text
+                              .replaceAll(RegExp(r'\D'), '')
+                              .length >=
                           10,
                   decoration: AppInputDecoration.build(
                     context,
@@ -1858,7 +1886,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   LengthLimitingTextInputFormatter(12),
                   PhoneInputFormatter(),
                 ],
-                enabled: !_isLoading &&
+                enabled:
+                    !_isLoading &&
                     _emergencyNameController.text.trim().isNotEmpty,
                 onChanged: (v) => setState(() {}),
               ),
@@ -1869,11 +1898,12 @@ class _RegisterPageState extends State<RegisterPage> {
                   final layout = _calcularDropdownParentescoLayout(context);
                   final mq = MediaQuery.of(context);
                   return Positioned(
-                    left: (_relationshipFieldKey.currentContext
-                                 ?.findRenderObject()
-                             as RenderBox?)
-                        ?.localToGlobal(Offset.zero)
-                        .dx ??
+                    left:
+                        (_relationshipFieldKey.currentContext
+                                    ?.findRenderObject()
+                                as RenderBox?)
+                            ?.localToGlobal(Offset.zero)
+                            .dx ??
                         0,
                     top: layout.top,
                     width: layout.width,
@@ -1935,7 +1965,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             onPressed: _toggleDropdownParentesco,
                           ),
                   ),
-                  enabled: !_isLoading &&
+                  enabled:
+                      !_isLoading &&
                       _emergencyPhoneController.text.length >= 14,
                 ),
               ),
@@ -2009,6 +2040,12 @@ class _RegisterPageState extends State<RegisterPage> {
                                 onPressed: () {
                                   setState(() {
                                     _cepController.clear();
+                                    _logradouroController.clear();
+                                    _numeroController.clear();
+                                    _complementoController.clear();
+                                    _bairroController.clear();
+                                    _estadoController.clear();
+                                    _municipioController.clear();
                                     _erroCep = null;
                                     _ultimoCepBuscado = '';
                                   });
@@ -2050,7 +2087,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
-                enabled: !_isLoading &&
+                enabled:
+                    !_isLoading &&
                     _cepController.text.replaceAll(RegExp(r'\D'), '').length ==
                         8,
                 onChanged: (v) => setState(() {}),
@@ -2075,8 +2113,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
-                enabled: !_isLoading &&
-                    _logradouroController.text.trim().isNotEmpty,
+                enabled:
+                    !_isLoading && _logradouroController.text.trim().isNotEmpty,
                 onChanged: (v) => setState(() {}),
                 validator: (value) {
                   if ((value ?? '').trim().isEmpty) {
@@ -2097,8 +2135,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
-                enabled: !_isLoading &&
-                    _numeroController.text.trim().isNotEmpty,
+                enabled:
+                    !_isLoading && _numeroController.text.trim().isNotEmpty,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -2113,8 +2151,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                 ),
-                enabled: !_isLoading &&
-                    _numeroController.text.trim().isNotEmpty,
+                enabled:
+                    !_isLoading && _numeroController.text.trim().isNotEmpty,
                 onChanged: (v) => setState(() {}),
                 validator: (value) {
                   if ((value ?? '').trim().isEmpty) {
@@ -2155,8 +2193,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   focusNode: _estadoFocusNode,
                   readOnly: !_estadoModoDigitacao,
                   onTap: _onEstadoTap,
-                  enabled: !_isLoading &&
-                      _bairroController.text.trim().isNotEmpty,
+                  enabled:
+                      !_isLoading && _bairroController.text.trim().isNotEmpty,
                   validator: (v) {
                     if (_estadoSelecionado == null) return 'Informe a UF';
                     return null;
@@ -2422,7 +2460,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 if (_ubsDropdownAberto) {
                                   _fecharDropdownUbs();
                                 } else {
-                                  _onUbsTap();
+                                  _onUbsTap(fromArrow: true);
                                 }
                               },
                             ),
@@ -2464,7 +2502,9 @@ class _RegisterPageState extends State<RegisterPage> {
               Row(
                 children: [
                   TextButton(
-                    onPressed: _isLoading ? null : () => setState(() => _currentStep = 0),
+                    onPressed: _isLoading
+                        ? null
+                        : () => setState(() => _currentStep = 0),
                     child: const Text('Voltar'),
                   ),
                   const Spacer(),
@@ -2547,7 +2587,8 @@ class _RegisterPageState extends State<RegisterPage> {
                         setState(() => _showPassword = !_showPassword),
                   ),
                 ),
-                enabled: !_isLoading &&
+                enabled:
+                    !_isLoading &&
                     _cpfController.text.replaceAll(RegExp(r'\D'), '').length ==
                         11,
                 onChanged: (v) => setState(() {}),
@@ -2571,7 +2612,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: colorScheme.primary,
                   ),
                   suffixIcon: IconButton(
-                    tooltip: _showConfirmPassword ? 'Ocultar senha' : 'Ver senha',
+                    tooltip: _showConfirmPassword
+                        ? 'Ocultar senha'
+                        : 'Ver senha',
                     icon: Icon(
                       _showConfirmPassword
                           ? Icons.visibility_off
@@ -2595,7 +2638,9 @@ class _RegisterPageState extends State<RegisterPage> {
               Row(
                 children: [
                   TextButton(
-                    onPressed: _isLoading ? null : () => setState(() => _currentStep = 1),
+                    onPressed: _isLoading
+                        ? null
+                        : () => setState(() => _currentStep = 1),
                     child: const Text('Voltar'),
                   ),
                   const Spacer(),
@@ -2618,8 +2663,6 @@ class _RegisterPageState extends State<RegisterPage> {
         return const SizedBox.shrink();
     }
   }
-
-
 
   Future<void> _submit() async {
     final app = context.read<AppState>();
@@ -2646,7 +2689,29 @@ class _RegisterPageState extends State<RegisterPage> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cadastro realizado com sucesso!')),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 3),
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_outline, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Cadastro realizado com sucesso!',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -2792,6 +2857,11 @@ class _RegisterPageState extends State<RegisterPage> {
                               SizedBox(
                                 height: _relationshipDropdownAberto
                                     ? (_relationshipOptions.length * 44.0)
+                                    : _ubsDropdownAberto
+                                    ? (_ubsFiltradas.isEmpty
+                                              ? 70.0
+                                              : (_ubsFiltradas.length * 64.0))
+                                          .clamp(0.0, 300.0)
                                     : 0.0,
                               ),
                             ],
@@ -2807,7 +2877,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       ),
     );
-}
+  }
 }
 
 class _DropdownString extends StatelessWidget {

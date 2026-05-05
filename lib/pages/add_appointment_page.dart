@@ -297,13 +297,21 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       _specialtyFieldKey.currentState?.validate();
     }
 
-    final q = _specialtyController.text.trim().toLowerCase();
+    final q = _specialtyController.text
+        .trim()
+        .replaceAll('\n', ' - ')
+        .toLowerCase();
     setState(() {
       _profissionaisFiltrados = q.isEmpty
           ? _todosProfissionais
-          : _todosProfissionais
-                .where((e) => e.displayText.toLowerCase().contains(q))
-                .toList();
+          : _todosProfissionais.where((e) {
+              final display = e.displayText.toLowerCase();
+              final nomeAndSpec = '${e.nome} - ${e.especialidade}'
+                  .toLowerCase();
+              return display.contains(q) ||
+                  nomeAndSpec.contains(q) ||
+                  q.contains(e.nome.toLowerCase());
+            }).toList();
     });
   }
 
@@ -342,9 +350,13 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       _dailyCapacity = null;
       _appointmentsCount = 0;
       _selectedShift = AppointmentShift.morning;
+      _especModoDigitacao = true;
     });
-    _specialtyFocusNode.requestFocus();
-    _abrirDropdownEspecialidade();
+
+    // Esconde o dropdown para evitar que ele fique mal posicionado
+    if (_dropdownEspecAberto) {
+      _fecharDropdownEspecialidade();
+    }
   }
 
   void _abrirDropdownEspecialidade() {
@@ -361,13 +373,29 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     }
   }
 
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text
+        .toLowerCase()
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return word;
+          // Preposições comuns para não capitalizar, se desejar. Mas o básico está ótimo:
+          if (['de', 'da', 'do', 'dos', 'das', 'e'].contains(word)) return word;
+          return word[0].toUpperCase() + word.substring(1);
+        })
+        .join(' ');
+  }
+
   void _selecionarEspecialidade(CnesProfissional prof) {
     setState(() {
       _profissionalSelecionado = prof;
     });
-    _specialtyController.text = prof.displayText;
+    final newText =
+        '${_capitalize(prof.nome)}\n${_capitalize(prof.especialidade)}';
+    _specialtyController.text = newText;
     _specialtyController.selection = TextSelection.collapsed(
-      offset: prof.displayText.length,
+      offset: newText.length,
     );
     _fecharDropdownEspecialidade();
     FocusManager.instance.primaryFocus?.unfocus();
@@ -426,20 +454,25 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     FocusManager.instance.primaryFocus?.unfocus();
 
     final now = DateTime.now();
-    DateTime initial = _selectedDate ?? now;
 
+    // Calcula o primeiro dia disponível baseado nas regras de bloqueio.
+    DateTime first = DateTime(now.year, now.month, now.day);
+    // Tarde vai até 17h, com 3h de antecedência limite é 14h.
+    if (now.hour >= 14) {
+      first = first.add(const Duration(days: 1));
+    }
+    while (first.weekday == DateTime.saturday ||
+        first.weekday == DateTime.sunday) {
+      first = first.add(const Duration(days: 1));
+    }
+
+    DateTime initial = _selectedDate ?? first;
+    if (initial.isBefore(first)) {
+      initial = first;
+    }
     while (initial.weekday == DateTime.saturday ||
         initial.weekday == DateTime.sunday) {
       initial = initial.add(const Duration(days: 1));
-    }
-
-    final first = DateTime(now.year, now.month, now.day);
-    if (initial.isBefore(first)) {
-      initial = first;
-      while (initial.weekday == DateTime.saturday ||
-          initial.weekday == DateTime.sunday) {
-        initial = initial.add(const Duration(days: 1));
-      }
     }
 
     final picked = await showDatePicker(
@@ -454,7 +487,16 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     if (picked != null && _selectedDate != picked) {
       setState(() {
         _selectedDate = picked;
-        _selectedShift = AppointmentShift.morning;
+        // Se escolheu hoje e já for >= 9h, obriga a selecionar tarde pois a manhã já encerrou (12h - 3h limite = 9h).
+        final isToday =
+            picked.year == now.year &&
+            picked.month == now.month &&
+            picked.day == now.day;
+        if (isToday && now.hour >= 9) {
+          _selectedShift = AppointmentShift.afternoon;
+        } else {
+          _selectedShift = AppointmentShift.morning;
+        }
         _dateAvailabilityCalculated = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -500,6 +542,37 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     });
 
     final date = _selectedDate!;
+    final now = DateTime.now();
+    final isToday =
+        date.year == now.year && date.month == now.month && date.day == now.day;
+
+    if (isToday) {
+      if (_selectedShift == AppointmentShift.morning && now.hour >= 9) {
+        setState(() {
+          _isDateLoading = false;
+          _isDateBlocked = true;
+          _dailyCapacity = 0;
+          _appointmentsCount = 0;
+          _dateAvailabilityCalculated = true;
+          _dateAvailabilityLabel =
+              'Turno da manhã encerrado para agendamentos de hoje';
+        });
+        return;
+      }
+      if (_selectedShift == AppointmentShift.afternoon && now.hour >= 14) {
+        setState(() {
+          _isDateLoading = false;
+          _isDateBlocked = true;
+          _dailyCapacity = 0;
+          _appointmentsCount = 0;
+          _dateAvailabilityCalculated = true;
+          _dateAvailabilityLabel =
+              'Turno da tarde encerrado para agendamentos de hoje';
+        });
+        return;
+      }
+    }
+
     if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
       setState(() {
         _isDateLoading = false;
@@ -537,17 +610,15 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       var query = Supabase.instance.client
           .from('appointments')
           .select('id')
-          .eq('location', _estabelecimenteSelecionado!.codigoCnes.toString())
+          .eq('cnes_id', _estabelecimenteSelecionado!.codigoCnes.toString())
           .eq('shift', _selectedShift.dbValue)
           .gte('date_time', dataInicio)
           .lte('date_time', dataFim);
 
       if (_profissionalSelecionado!.id != null) {
-        query = query.eq('professional_id', _profissionalSelecionado!.id!);
+        query = query.eq('professional_cns', _profissionalSelecionado!.id!);
       } else {
-        query = query
-            .eq('specialty', _profissionalSelecionado!.especialidade)
-            .eq('professional_name', _profissionalSelecionado!.nome);
+        query = query.eq('specialty', _profissionalSelecionado!.especialidade);
       }
 
       final appointmentsResp = await query;
@@ -565,16 +636,14 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       var query = Supabase.instance.client
           .from('blocked_times')
           .select('date_time')
-          .eq('location', _estabelecimenteSelecionado!.codigoCnes.toString())
+          .eq('cnes_id', _estabelecimenteSelecionado!.codigoCnes.toString())
           .gte('date_time', dataInicio)
           .lte('date_time', dataFim);
 
       if (_profissionalSelecionado!.id != null) {
-        query = query.eq('professional_id', _profissionalSelecionado!.id!);
+        query = query.eq('professional_cns', _profissionalSelecionado!.id!);
       } else {
-        query = query
-            .eq('specialty', _profissionalSelecionado!.especialidade)
-            .eq('professional_name', _profissionalSelecionado!.nome);
+        query = query.eq('specialty', _profissionalSelecionado!.especialidade);
       }
 
       final blockedResp = await query.limit(1);
@@ -932,7 +1001,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              prof.nome,
+                                              _capitalize(prof.nome),
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium
@@ -941,7 +1010,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                                   ),
                                             ),
                                             Text(
-                                              prof.especialidade,
+                                              _capitalize(prof.especialidade),
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodySmall
@@ -975,6 +1044,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                         focusNode: _specialtyFocusNode,
                         readOnly: !_especModoDigitacao,
                         enabled: hasLocation,
+                        maxLines: null,
                         onTap: () {
                           if (_todosProfissionais.isNotEmpty) {
                             _onSpecialtyTap();
@@ -1085,14 +1155,30 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                       ),
                       const SizedBox(height: 8),
                       SegmentedButton<AppointmentShift>(
-                        segments: const [
+                        segments: [
                           ButtonSegment<AppointmentShift>(
                             value: AppointmentShift.morning,
-                            label: Text('Manhã'),
+                            label: const Text('Manhã'),
+                            enabled:
+                                !(_selectedDate != null &&
+                                    _selectedDate!.year ==
+                                        DateTime.now().year &&
+                                    _selectedDate!.month ==
+                                        DateTime.now().month &&
+                                    _selectedDate!.day == DateTime.now().day &&
+                                    DateTime.now().hour >= 9),
                           ),
                           ButtonSegment<AppointmentShift>(
                             value: AppointmentShift.afternoon,
-                            label: Text('Tarde'),
+                            label: const Text('Tarde'),
+                            enabled:
+                                !(_selectedDate != null &&
+                                    _selectedDate!.year ==
+                                        DateTime.now().year &&
+                                    _selectedDate!.month ==
+                                        DateTime.now().month &&
+                                    _selectedDate!.day == DateTime.now().day &&
+                                    DateTime.now().hour >= 14),
                           ),
                         ],
                         selected: {_selectedShift},
