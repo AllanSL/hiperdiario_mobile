@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../core/providers/accessibility_provider.dart';
-import '../core/services/notification_service.dart';
+import '../../core/providers/accessibility_provider.dart';
+import '../../core/services/notification_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});

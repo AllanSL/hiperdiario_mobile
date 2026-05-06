@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
-import 'pages/home_page.dart';
-import 'package:hiperdiario/pages/login_page.dart';
+import 'pages/Agenda/Home.dart';
+import 'package:hiperdiario/pages/Autenticacao/Login.dart';
 import 'state/app_state.dart';
 
 class HiperDiarioApp extends StatelessWidget {

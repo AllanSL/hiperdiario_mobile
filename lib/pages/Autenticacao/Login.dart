@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../core/widgets/app_input_decoration.dart';
-import '../core/providers/accessibility_provider.dart';
-import '../core/providers/theme_provider.dart';
-import '../core/services/ibge_service.dart';
-import '../core/services/municipio_service.dart';
-import '../core/services/via_cep_service.dart';
-import '../core/services/cnes_service.dart';
-import '../state/app_state.dart';
+import '../../core/widgets/app_input_decoration.dart';
+import '../../core/providers/accessibility_provider.dart';
+import '../../core/providers/theme_provider.dart';
+import '../../core/services/ibge_service.dart';
+import '../../core/services/municipio_service.dart';
+import '../../core/services/via_cep_service.dart';
+import '../../core/services/cnes_service.dart';
+import '../../state/app_state.dart';
 
 class CpfInputFormatter extends TextInputFormatter {
   @override
@@ -2686,6 +2686,11 @@ class _RegisterPageState extends State<RegisterPage> {
         uf: _estadoSelecionado?.sigla,
         municipioIbge: _municipioSelecionado?.codigoMunicipio.toString(),
         ubsCnes: _ubsSelecionada?.codigoCnes.toString(),
+        zipCode: _cepController.text,
+        street: _logradouroController.text,
+        number: _numeroController.text,
+        neighborhood: _bairroController.text,
+        complement: _complementoController.text,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

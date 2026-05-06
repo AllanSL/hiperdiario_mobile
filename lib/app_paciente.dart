@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import '../core/providers/accessibility_provider.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/theme/app_theme.dart';
-import 'pages/home_page.dart';
-import 'pages/login_page.dart';
+import 'pages/Agenda/Home.dart';
+import 'pages/Autenticacao/Login.dart';
 import 'state/app_state.dart';
 
 class HiperDiarioPacienteApp extends StatelessWidget {

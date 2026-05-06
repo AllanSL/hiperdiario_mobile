@@ -99,7 +99,7 @@ class AppState extends ChangeNotifier {
         final patientExists = await _supabase
             .from('patients')
             .select('id')
-            .eq('remote_id', user.id)
+            .eq('user_id', user.id)
             .maybeSingle();
 
         if (patientExists == null) {
@@ -115,9 +115,19 @@ class AppState extends ChangeNotifier {
             throw Exception(
               'Acesso negado. Este aplicativo é exclusivo para pacientes.',
             );
+          } else {
+            // Se não é paciente nem profissional cadastrado, desloga para evitar estado inconsistente
+            await logout();
+            throw Exception(
+              'Perfil de paciente não encontrado. Entre em contato com a recepção.',
+            );
           }
         }
       }
+    } catch (e) {
+      _isLogged = false;
+      _patient = null;
+      rethrow;
     } finally {
       _isAuthenticating = false;
       notifyListeners();
@@ -139,6 +149,11 @@ class AppState extends ChangeNotifier {
     String? uf,
     String? municipioIbge,
     String? ubsCnes,
+    String? zipCode,
+    String? street,
+    String? number,
+    String? neighborhood,
+    String? complement,
   }) async {
     final cleanCpf = cpf.replaceAll(RegExp(r'\D'), '');
     if (!_isValidCpf(cleanCpf)) {
@@ -198,6 +213,11 @@ class AppState extends ChangeNotifier {
               uf: uf,
               municipioIbge: municipioIbge,
               ubsCnes: ubsCnes,
+              zipCode: zipCode,
+              street: street,
+              number: number,
+              neighborhood: neighborhood,
+              complement: complement,
             ),
             allowUpdateExisting: false,
           );
@@ -229,6 +249,11 @@ class AppState extends ChangeNotifier {
           uf: uf,
           municipioIbge: municipioIbge,
           ubsCnes: ubsCnes,
+          zipCode: zipCode,
+          street: street,
+          number: number,
+          neighborhood: neighborhood,
+          complement: complement,
         ),
         allowUpdateExisting: false,
       );
@@ -323,6 +348,11 @@ class AppState extends ChangeNotifier {
     String? uf,
     String? municipioIbge,
     String? ubsCnes,
+    String? zipCode,
+    String? street,
+    String? number,
+    String? neighborhood,
+    String? complement,
   }) {
     final parsedBirthDate = _parseDate(birthDate);
     final municipio = int.tryParse((municipioIbge ?? '').trim());
@@ -347,7 +377,7 @@ class AppState extends ChangeNotifier {
     }
 
     final payload = <String, dynamic>{
-      'remote_id': userId,
+      'user_id': userId,
       'name': name.trim(),
       'cpf': cleanCpf,
       'birth_date': parsedBirthDate?.toIso8601String(),
@@ -356,9 +386,16 @@ class AppState extends ChangeNotifier {
       'phone': (phone ?? '').trim().isEmpty ? null : phone?.trim(),
       'email': (email ?? '').trim().isEmpty ? null : email?.trim(),
       'emergency_contact': emergencyContact,
-      'uf': (uf ?? '').trim().isEmpty ? null : uf?.trim().toUpperCase(),
-      'municipio_ibge': municipio,
+      'state_code': (uf ?? '').trim().isEmpty ? null : uf?.trim().toUpperCase(),
+      'city_ibge': municipio,
       'ubs_cnes': (ubsCnes ?? '').trim().isEmpty ? null : ubsCnes?.trim(),
+      'zip_code': (zipCode ?? '').trim().isEmpty ? null : zipCode?.trim(),
+      'street': (street ?? '').trim().isEmpty ? null : street?.trim(),
+      'number': (number ?? '').trim().isEmpty ? null : number?.trim(),
+      'neighborhood':
+          (neighborhood ?? '').trim().isEmpty ? null : neighborhood?.trim(),
+      'complement':
+          (complement ?? '').trim().isEmpty ? null : complement?.trim(),
     };
 
     // remove nulls to avoid overriding defaults
@@ -374,7 +411,7 @@ class AppState extends ChangeNotifier {
     final existingByRemote = await _supabase
         .from('patients')
         .select('id')
-        .eq('remote_id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
 
     if (existingByRemote != null) {
@@ -392,7 +429,7 @@ class AppState extends ChangeNotifier {
     if (cpf != null && cpf.isNotEmpty) {
       final existingByCpf = await _supabase
           .from('patients')
-          .select('id, remote_id')
+          .select('id, user_id')
           .eq('cpf', cpf)
           .maybeSingle();
       if (existingByCpf != null) {
@@ -484,7 +521,7 @@ class AppState extends ChangeNotifier {
     Map<String, dynamic>? profile = await _supabase
         .from('patients')
         .select('*')
-        .eq('remote_id', user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
     if (profile == null) {
@@ -515,11 +552,11 @@ class AppState extends ChangeNotifier {
     }
 
     String? nomeMunicipio;
-    final municipioRaw = profile?['municipio_ibge'];
+    final municipioRaw = profile?['city_ibge'];
     final codigoMunicipio = municipioRaw is int
         ? municipioRaw
         : int.tryParse('${municipioRaw ?? ''}');
-    final siglaUf = profile?['uf']?.toString();
+    final siglaUf = profile?['state_code']?.toString();
     final codigoUf = _resolveCodigoUf(siglaUf);
 
     if (codigoMunicipio != null && siglaUf != null && codigoUf != null) {
@@ -574,7 +611,7 @@ class AppState extends ChangeNotifier {
     if (profileId != null) {
       final appointmentRows = await _supabase
           .from('appointments')
-          .select('*')
+          .select('*, professionals(name, specialty), cnes_establishments(name)')
           .eq('patient_id', profileId)
           .order('date_time', ascending: true);
       _appointments = (appointmentRows as List)
@@ -821,7 +858,7 @@ class AppState extends ChangeNotifier {
 
     final birthDate =
         _parseDateTime(row?['birth_date']) ?? DateTime(1970, 1, 1);
-    final municipio = row?['municipio_ibge'];
+    final municipio = row?['city_ibge'];
     final diseasesRaw = row?['diseases'];
     final diseases = diseasesRaw is List
         ? diseasesRaw
@@ -860,10 +897,15 @@ class AppState extends ChangeNotifier {
           ? row!['ubs_cnes'].toString()
           : 'UBS não informada',
       ubsName: ubsName ?? row?['ubs_name']?.toString(),
+      zipCode: row?['zip_code']?.toString(),
+      street: row?['street']?.toString(),
+      number: row?['number']?.toString(),
+      neighborhood: row?['neighborhood']?.toString(),
+      complement: row?['complement']?.toString(),
       email: (row?['email'] ?? email)?.toString(),
       emergencyContact: emergencyContact,
-      codigoUf: _resolveCodigoUf(row?['uf']?.toString()),
-      siglaUf: row?['uf']?.toString(),
+      codigoUf: _resolveCodigoUf(row?['state_code']?.toString()),
+      siglaUf: row?['state_code']?.toString(),
       codigoMunicipio: municipio is int
           ? municipio
           : int.tryParse('${municipio ?? ''}'),
@@ -901,12 +943,19 @@ class AppState extends ChangeNotifier {
       attended = false;
     }
 
+    final profData = row['professionals'] as Map<String, dynamic>?;
+    final estabData = row['cnes_establishments'] as Map<String, dynamic>?;
+
+    final professionalName = profData?['name'] ?? row['professional_name'];
+    final professionalSpecialty = profData?['specialty'];
+    final establishmentName = estabData?['name'];
+
     return Appointment(
       id: (row['remote_id'] ?? row['id']).toString(),
       dateTime: dateTime,
-      location: (row['cnes_id'] ?? 'Local não informado').toString(),
-      specialty: (row['specialty'] ?? 'Consulta').toString(),
-      professionalName: row['professional_name']?.toString(),
+      location: (establishmentName ?? row['cnes_id'] ?? 'Local não informado').toString(),
+      specialty: (professionalSpecialty ?? row['specialty'] ?? 'Consulta').toString(),
+      professionalName: professionalName?.toString(),
       professionalId: row['professional_cns']?.toString(),
       shift: shiftRaw != null
           ? AppointmentShiftX.fromDb(shiftRaw)
@@ -1064,7 +1113,6 @@ class AppState extends ChangeNotifier {
     final user = _supabase.auth.currentUser;
     if (user != null && _patient != null) {
       try {
-        // Usa o CPF do paciente que j est garantido e com fallback correto
         final profile = await _supabase
             .from('patients')
             .select('id')
@@ -1079,12 +1127,11 @@ class AppState extends ChangeNotifier {
 
         if (profile != null) {
           final doc = {
-            'remote_id': appt.id,
             'patient_id': profile['id'],
             'date_time': appt.dateTime.toUtc().toIso8601String(),
-            'cnes_id': appt.location,
             'establishment_id': estab?['id'],
-            'specialty': appt.specialty,
+            'cnes_id': appt.location,
+            'specialty': appt.professionalId != null ? null : appt.specialty,
             'professional_cns': appt.professionalId,
             'shift': appt.shift.dbValue,
             'notes': appt.notes,
@@ -1132,9 +1179,9 @@ class AppState extends ChangeNotifier {
 
         final doc = {
           'date_time': appt.dateTime.toUtc().toIso8601String(),
-          'cnes_id': appt.location,
           'establishment_id': estab?['id'],
-          'specialty': appt.specialty,
+          'cnes_id': appt.location,
+          'specialty': appt.professionalId != null ? null : appt.specialty,
           'professional_cns': appt.professionalId,
           'shift': appt.shift.dbValue,
           'notes': appt.notes,
@@ -1305,8 +1352,8 @@ class AppState extends ChangeNotifier {
       // forçar o usuário a selecionar uma UBS no novo município.
       final bool municipioMudou = _patient!.codigoMunicipio != codigoMunicipio;
       final payload = <String, dynamic>{
-        'uf': siglaUf,
-        'municipio_ibge': codigoMunicipio,
+        'state_code': siglaUf,
+        'city_ibge': codigoMunicipio,
       };
       if (municipioMudou) {
         payload['ubs_cnes'] = '';

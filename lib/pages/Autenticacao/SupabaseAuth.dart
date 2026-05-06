@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/widgets/app_input_decoration.dart';
+import '../../core/widgets/app_input_decoration.dart';
 
 class SupabaseAuthPage extends StatefulWidget {
   const SupabaseAuthPage({super.key});

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../core/models/appointment.dart';
-import '../core/services/cnes_service.dart';
-import '../state/app_state.dart';
-import 'add_appointment_page.dart';
+import '../../core/models/appointment.dart';
+import '../../core/services/cnes_service.dart';
+import '../../state/app_state.dart';
+import 'NovaConsulta.dart';
 
 class AppointmentsPage extends StatelessWidget {
   const AppointmentsPage({super.key});
@@ -284,19 +284,20 @@ class _AppointmentCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (appointment.professionalName != null)
+                        Text(
+                          appointment.professionalName!.toUpperCase(),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       Text(
                         appointment.specialty.toUpperCase(),
                         style: textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      if (appointment.professionalName != null)
-                        Text(
-                          appointment.professionalName!.toUpperCase(),
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
                     ],
                   ),
                 ),

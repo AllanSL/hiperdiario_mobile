@@ -74,25 +74,25 @@ class CnesEstabelecimento {
 /// Representa um profissional de saúde retornado pela API CNES.
 class CnesProfissional {
   final String? id; // Supabase UUID
-  final String nome;
-  final String especialidade;
+  final String name;
+  final String specialty;
 
   const CnesProfissional({
     this.id,
-    required this.nome,
-    required this.especialidade,
+    required this.name,
+    required this.specialty,
   });
 
-  CnesProfissional copyWith({String? id, String? nome, String? especialidade}) {
+  CnesProfissional copyWith({String? id, String? name, String? specialty}) {
     return CnesProfissional(
       id: id ?? this.id,
-      nome: nome ?? this.nome,
-      especialidade: especialidade ?? this.especialidade,
+      name: name ?? this.name,
+      specialty: specialty ?? this.specialty,
     );
   }
 
   /// Texto exibido no campo de texto após selecionar a opção.
-  String get displayText => '$especialidade - $nome';
+  String get displayText => '$specialty - $name';
 
   @override
   String toString() => displayText;
@@ -103,11 +103,11 @@ class CnesProfissional {
       other is CnesProfissional &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          nome == other.nome &&
-          especialidade == other.especialidade;
+          name == other.name &&
+          specialty == other.specialty;
 
   @override
-  int get hashCode => id.hashCode ^ nome.hashCode ^ especialidade.hashCode;
+  int get hashCode => id.hashCode ^ name.hashCode ^ specialty.hashCode;
 }
 
 /// Serviço para consulta à API de Dados Abertos do CNES (Cadastro Nacional de Estabelecimentos de Saúde) e Edge Function Supabase.
@@ -163,7 +163,7 @@ class CnesService {
       // 2. Busca os profissionais que possuem login/cadastro no nosso sistema para esta UBS
       final response = await _supabase
           .from('professionals')
-          .select('cns, nome, especialidade')
+          .select('cns, name, specialty')
           .eq('cnes', cnes7Digitos.toString());
 
       final cadastrados = response as List<dynamic>;
@@ -172,10 +172,10 @@ class CnesService {
       final merged = listaCnes.map<CnesProfissional>((pCnes) {
         Map<String, dynamic>? match;
         for (final pDb in cadastrados) {
-          final nomeDb = removeDiacritics((pDb['nome'] as String? ?? '').trim().toLowerCase());
-          final espDb = removeDiacritics((pDb['especialidade'] as String? ?? '').trim().toLowerCase());
-          final nomeCnes = removeDiacritics(pCnes.nome.toLowerCase());
-          final espCnes = removeDiacritics(pCnes.especialidade.toLowerCase());
+          final nomeDb = removeDiacritics((pDb['name'] as String? ?? '').trim().toLowerCase());
+          final espDb = removeDiacritics((pDb['specialty'] as String? ?? '').trim().toLowerCase());
+          final nomeCnes = removeDiacritics(pCnes.name.toLowerCase());
+          final espCnes = removeDiacritics(pCnes.specialty.toLowerCase());
           if (nomeDb == nomeCnes && espDb == espCnes) {
             match = pDb as Map<String, dynamic>;
             break;
@@ -261,6 +261,7 @@ class CnesService {
               cbo.contains('FISIOTERAPEUTA')) {
             cbo = cbo.replaceAll('CIRURGIAODENTISTA', 'CIRURGIÃO DENTISTA');
             cbo = cbo.replaceAll('CIRURGIO DENTISTA', 'CIRURGIÃO DENTISTA');
+            cbo = cbo.replaceAll('CLINICO', 'CLÍNICO'); 
             cbo = cbo.replaceAll(RegExp(r'\s+'), ' ').trim();
 
             if (cbo.startsWith('MEDICO ')) {
@@ -270,7 +271,7 @@ class CnesService {
               cbo = cbo.replaceFirst('PSICOLOGO ', 'PSICÓLOGO ');
             }
 
-            profissionais.add(CnesProfissional(id: cns, nome: nome, especialidade: cbo));
+            profissionais.add(CnesProfissional(id: cns, name: nome, specialty: cbo));
           }
         }
 

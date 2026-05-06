@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../core/models/emergency_contact.dart';
-import '../core/services/cnes_service.dart';
-import '../core/services/ibge_service.dart';
-import '../core/services/municipio_service.dart';
-import '../core/widgets/app_input_decoration.dart';
-import '../state/app_state.dart';
+import '../../core/models/emergency_contact.dart';
+import '../../core/services/cnes_service.dart';
+import '../../core/services/ibge_service.dart';
+import '../../core/services/municipio_service.dart';
+import '../../core/widgets/app_input_decoration.dart';
+import '../../state/app_state.dart';
 
 /// Formatter para telefone brasileiro: (00) 00000-0000 ou (00) 0000-0000
 class PhoneInputFormatter extends TextInputFormatter {

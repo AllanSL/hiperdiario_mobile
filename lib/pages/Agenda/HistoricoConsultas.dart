@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../core/models/appointment.dart';
-import '../state/app_state.dart';
+import '../../core/models/appointment.dart';
+import '../../state/app_state.dart';
 
 int _shiftOrder(AppointmentShift shift) {
   return switch (shift) {
@@ -161,21 +161,27 @@ class _HistoryCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        appointment.specialty,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (appointment.professionalName != null)
+                      if (appointment.professionalName != null ||
+                          appointment.specialty.contains('\n'))
                         Text(
-                          appointment.professionalName!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
+                          (appointment.professionalName ??
+                                  appointment.specialty.split('\n').first)
+                              .toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
+                      Text(
+                        (appointment.specialty.contains('\n')
+                                ? appointment.specialty.split('\n').last
+                                : appointment.specialty)
+                            .toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ],
                   ),
                 ),

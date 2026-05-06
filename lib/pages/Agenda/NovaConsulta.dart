@@ -3,10 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../core/models/appointment.dart';
-import '../core/services/cnes_service.dart';
-import '../core/widgets/app_input_decoration.dart';
-import '../state/app_state.dart';
+import '../../core/models/appointment.dart';
+import '../../core/services/cnes_service.dart';
+import '../../core/widgets/app_input_decoration.dart';
+import '../../state/app_state.dart';
 
 class AddAppointmentPage extends StatefulWidget {
   final Appointment? appointment;
@@ -34,6 +34,8 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   int? _dailyCapacity;
   int _appointmentsCount = 0;
   String? _dateAvailabilityLabel;
+  Set<AppointmentShift> _blockedShifts = {};
+  Set<AppointmentShift> _fullShifts = {};
 
   // CNES
   List<CnesEstabelecimento> _todosEstabelecimentos = [];
@@ -263,7 +265,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           if (targetId != null && p.id == targetId) {
             found = p;
             break;
-          } else if (p.nome == targetName && p.especialidade == targetSpec) {
+          } else if (p.name == targetName && p.specialty == targetSpec) {
             found = p;
             break;
           }
@@ -306,11 +308,11 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           ? _todosProfissionais
           : _todosProfissionais.where((e) {
               final display = e.displayText.toLowerCase();
-              final nomeAndSpec = '${e.nome} - ${e.especialidade}'
+              final nomeAndSpec = '${e.name} - ${e.specialty}'
                   .toLowerCase();
               return display.contains(q) ||
                   nomeAndSpec.contains(q) ||
-                  q.contains(e.nome.toLowerCase());
+                  q.contains(e.name.toLowerCase());
             }).toList();
     });
   }
@@ -392,7 +394,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       _profissionalSelecionado = prof;
     });
     final newText =
-        '${_capitalize(prof.nome)}\n${_capitalize(prof.especialidade)}';
+        '${_capitalize(prof.name)}\n${_capitalize(prof.specialty)}';
     _specialtyController.text = newText;
     _specialtyController.selection = TextSelection.collapsed(
       offset: newText.length,
@@ -527,6 +529,8 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         _dailyCapacity = null;
         _appointmentsCount = 0;
         _dateAvailabilityLabel = null;
+        _blockedShifts = {};
+        _fullShifts = {};
       });
       return;
     }
@@ -539,6 +543,8 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       _dailyCapacity = null;
       _appointmentsCount = 0;
       _dateAvailabilityLabel = null;
+      _blockedShifts = {};
+      _fullShifts = {};
     });
 
     final date = _selectedDate!;
@@ -546,31 +552,11 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     final isToday =
         date.year == now.year && date.month == now.month && date.day == now.day;
 
+    // 1. Verificações de horário para hoje
+    Set<AppointmentShift> timeBlocked = {};
     if (isToday) {
-      if (_selectedShift == AppointmentShift.morning && now.hour >= 9) {
-        setState(() {
-          _isDateLoading = false;
-          _isDateBlocked = true;
-          _dailyCapacity = 0;
-          _appointmentsCount = 0;
-          _dateAvailabilityCalculated = true;
-          _dateAvailabilityLabel =
-              'Turno da manhã encerrado para agendamentos de hoje';
-        });
-        return;
-      }
-      if (_selectedShift == AppointmentShift.afternoon && now.hour >= 14) {
-        setState(() {
-          _isDateLoading = false;
-          _isDateBlocked = true;
-          _dailyCapacity = 0;
-          _appointmentsCount = 0;
-          _dateAvailabilityCalculated = true;
-          _dateAvailabilityLabel =
-              'Turno da tarde encerrado para agendamentos de hoje';
-        });
-        return;
-      }
+      if (now.hour >= 9) timeBlocked.add(AppointmentShift.morning);
+      if (now.hour >= 14) timeBlocked.add(AppointmentShift.afternoon);
     }
 
     if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
@@ -581,113 +567,157 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         _appointmentsCount = 0;
         _dateAvailabilityCalculated = true;
         _dateAvailabilityLabel = 'Dia indisponível';
+        _blockedShifts = {
+          AppointmentShift.morning,
+          AppointmentShift.afternoon,
+        };
       });
       return;
     }
 
-    final startOfDay = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      0,
-      0,
-      0,
-    ).toUtc();
-    final endOfDay = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      23,
-      59,
-      59,
-      999,
-    ).toUtc();
+    final startOfDay =
+        DateTime(date.year, date.month, date.day, 0, 0, 0).toUtc();
+    final endOfDay =
+        DateTime(date.year, date.month, date.day, 23, 59, 59, 999).toUtc();
     final dataInicio = startOfDay.toIso8601String();
     final dataFim = endOfDay.toIso8601String();
 
-    int count = 0;
     try {
-      var query = Supabase.instance.client
-          .from('appointments')
-          .select('id')
-          .eq('cnes_id', _estabelecimenteSelecionado!.codigoCnes.toString())
-          .eq('shift', _selectedShift.dbValue)
-          .gte('date_time', dataInicio)
-          .lte('date_time', dataFim);
+      final cnes = _estabelecimenteSelecionado!.codigoCnes.toString();
+      final spec = _profissionalSelecionado?.specialty ??
+          (_specialtyController.text.contains('\n')
+              ? _specialtyController.text.split('\n').last
+              : _specialtyController.text.trim());
+      final profCns = _profissionalSelecionado?.id;
 
-      if (_profissionalSelecionado!.id != null) {
-        query = query.eq('professional_cns', _profissionalSelecionado!.id!);
-      } else {
-        query = query.eq('specialty', _profissionalSelecionado!.especialidade);
-      }
-
-      final appointmentsResp = await query;
-      count = appointmentsResp.length;
-      if (widget.appointment != null) {
-        final existsSameId = appointmentsResp.any(
-          (item) => item['id'] == widget.appointment!.id,
-        );
-        if (existsSameId) count = count - 1;
-      }
-    } catch (_) {}
-
-    bool blocked = false;
-    try {
-      var query = Supabase.instance.client
+      // 2. Buscar todos os bloqueios do dia
+      var blockedQuery = Supabase.instance.client
           .from('blocked_times')
-          .select('date_time')
-          .eq('cnes_id', _estabelecimenteSelecionado!.codigoCnes.toString())
+          .select('shift')
+          .eq('cnes_id', cnes)
           .gte('date_time', dataInicio)
           .lte('date_time', dataFim);
 
-      if (_profissionalSelecionado!.id != null) {
-        query = query.eq('professional_cns', _profissionalSelecionado!.id!);
+      if (profCns != null) {
+        blockedQuery = blockedQuery.eq('professional_cns', profCns);
       } else {
-        query = query.eq('specialty', _profissionalSelecionado!.especialidade);
+        blockedQuery = blockedQuery.eq('specialty', spec);
       }
 
-      final blockedResp = await query.limit(1);
-      if (blockedResp.isNotEmpty) {
-        blocked = true;
+      final blockedResp = await blockedQuery;
+      Set<AppointmentShift> dbBlocked = {};
+      for (final b in blockedResp) {
+        final s = (b['shift'] as String?)?.toLowerCase();
+        if (s == null) continue;
+        
+        if (s == 'all') {
+          dbBlocked.add(AppointmentShift.morning);
+          dbBlocked.add(AppointmentShift.afternoon);
+        } else {
+          dbBlocked.add(AppointmentShiftX.fromDb(s));
+        }
       }
-    } catch (_) {}
 
-    const capacity = 5;
-    final isFull = count >= capacity;
-    setState(() {
-      _isDateLoading = false;
-      _isDateBlocked = blocked;
-      _isDateFull = isFull;
-      _dailyCapacity = capacity;
-      _appointmentsCount = count;
-      _dateAvailabilityCalculated = true;
-      if (blocked) {
-        _dateAvailabilityLabel = 'Dia indisponível';
-      } else if (isFull) {
-        _dateAvailabilityLabel = '${_selectedShift.label}: lotado';
-      } else {
-        _dateAvailabilityLabel =
-            '${_selectedShift.label}: $_appointmentsCount/$_dailyCapacity vagas ocupadas';
+      debugPrint('[AddAppointment] dbBlocked for $date: $dbBlocked');
+      debugPrint('[AddAppointment] timeBlocked for $date: $timeBlocked');
+      debugPrint('[AddAppointment] selectedShift: $_selectedShift');
+
+      // 3. Buscar contagem de agendamentos para cada turno
+      const capacity = 5;
+      Map<AppointmentShift, int> counts = {
+        AppointmentShift.morning: 0,
+        AppointmentShift.afternoon: 0,
+      };
+
+      for (final s in AppointmentShift.values) {
+        var countQuery = Supabase.instance.client
+            .from('appointments')
+            .select('id')
+            .eq('cnes_id', cnes)
+            .eq('shift', s.dbValue)
+            .gte('date_time', dataInicio)
+            .lte('date_time', dataFim);
+
+        if (profCns != null) {
+          countQuery = countQuery.eq('professional_cns', profCns);
+        } else {
+          countQuery = countQuery.eq('specialty', spec);
+        }
+
+        final resp = await countQuery;
+        int c = resp.length;
+
+        // Se estiver editando, não conta a si mesmo
+        if (widget.appointment != null &&
+            widget.appointment!.shift == s &&
+            DateFormat('yyyy-MM-dd').format(widget.appointment!.dateTime) ==
+                DateFormat('yyyy-MM-dd').format(date)) {
+          c = (c > 0) ? c - 1 : 0;
+        }
+        counts[s] = c;
       }
-    });
+
+      final isBlockedMorning = dbBlocked.contains(AppointmentShift.morning) || (isToday && now.hour >= 9);
+      final isBlockedAfternoon = dbBlocked.contains(AppointmentShift.afternoon) || (isToday && now.hour >= 14);
+      
+      final isFullMorning = counts[AppointmentShift.morning]! >= capacity;
+      final isFullAfternoon = counts[AppointmentShift.afternoon]! >= capacity;
+
+      final currentBlocked = _selectedShift == AppointmentShift.morning ? isBlockedMorning : isBlockedAfternoon;
+      final currentFull = _selectedShift == AppointmentShift.morning ? isFullMorning : isFullAfternoon;
+
+      setState(() {
+        _isDateLoading = false;
+        _blockedShifts = {
+          if (isBlockedMorning) AppointmentShift.morning,
+          if (isBlockedAfternoon) AppointmentShift.afternoon,
+        };
+        _fullShifts = {
+          if (isFullMorning) AppointmentShift.morning,
+          if (isFullAfternoon) AppointmentShift.afternoon,
+        };
+        _isDateBlocked = currentBlocked;
+        _isDateFull = currentFull;
+        _dailyCapacity = capacity;
+        _appointmentsCount = counts[_selectedShift] ?? 0;
+        _dateAvailabilityCalculated = true;
+
+        if (currentBlocked) {
+          _dateAvailabilityLabel = 'Turno indisponível';
+        } else if (currentFull) {
+          _dateAvailabilityLabel = 'Turno lotado';
+        } else {
+          _dateAvailabilityLabel =
+              '$_appointmentsCount/$_dailyCapacity vagas ocupadas';
+        }
+      });
+    } catch (e) {
+      debugPrint('[AddAppointment] Erro ao verificar disponibilidade: $e');
+      setState(() {
+        _isDateLoading = false;
+        _dateAvailabilityCalculated = true;
+        _dateAvailabilityLabel = 'Erro ao verificar disponibilidade';
+      });
+    }
   }
 
   bool get _canSaveAppointment {
     if (_selectedDate == null) return false;
     if (_isDateLoading) return false;
     if (!_dateAvailabilityCalculated) return false;
-    if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0)
+    if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0) {
       return false;
+    }
     return true;
   }
 
   void _showDateAvailabilityError() {
     if (_isDateBlocked) {
       _showToast(
-        'Dia indisponível / atendimento suspenso. Escolha outra data.',
+        'Este turno está indisponível. Tente outro turno ou data.',
       );
     } else if (_isDateFull) {
-      _showToast('Limite do turno atingido. Escolha outra data ou turno.');
+      _showToast('Limite do turno atingido. Escolha outro turno ou data.');
     } else if ((_dailyCapacity ?? 0) == 0) {
       _showToast('Sem vagas disponíveis para este turno.');
     }
@@ -742,8 +772,15 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           DateTime.now().millisecondsSinceEpoch.toString(),
       dateTime: dateTime,
       location: _estabelecimenteSelecionado!.codigoCnes.toString(),
-      specialty: _specialtyController.text.trim(),
-      professionalName: _profissionalSelecionado?.nome,
+      specialty: _profissionalSelecionado != null
+          ? _profissionalSelecionado!.specialty
+          : (_specialtyController.text.contains('\n')
+              ? _specialtyController.text.split('\n').last
+              : _specialtyController.text.trim()),
+      professionalName: _profissionalSelecionado?.name ??
+          (_specialtyController.text.contains('\n')
+              ? _specialtyController.text.split('\n').first
+              : null),
       professionalId: _profissionalSelecionado?.id,
       notes: _notesController.text.trim().isEmpty
           ? null
@@ -844,7 +881,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                       prefixIcon: Icon(
                         Icons.location_on,
                         color: _locationFixa
-                            ? colorScheme.onSurfaceVariant.withOpacity(0.38)
+                            ? colorScheme.onSurfaceVariant.withValues(alpha: 0.38)
                             : colorScheme.primary,
                       ),
                       suffixIcon: _cnesCarregando
@@ -1001,7 +1038,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              _capitalize(prof.nome),
+                                              _capitalize(prof.name),
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium
@@ -1010,7 +1047,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                                   ),
                                             ),
                                             Text(
-                                              _capitalize(prof.especialidade),
+                                              _capitalize(prof.specialty),
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodySmall
@@ -1060,7 +1097,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                             Icons.medical_services,
                             color: hasLocation
                                 ? colorScheme.primary
-                                : colorScheme.onSurface.withOpacity(0.38),
+                                : colorScheme.onSurface.withValues(alpha: 0.38),
                           ),
                           suffixIcon: _especialidadesCarregando
                               ? Container(
@@ -1128,7 +1165,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                           Icons.calendar_today,
                           color: hasSpecialty
                               ? colorScheme.primary
-                              : colorScheme.onSurface.withOpacity(0.38),
+                              : colorScheme.onSurface.withValues(alpha: 0.38),
                         ),
                       ),
                       controller: TextEditingController(
@@ -1159,26 +1196,14 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                           ButtonSegment<AppointmentShift>(
                             value: AppointmentShift.morning,
                             label: const Text('Manhã'),
-                            enabled:
-                                !(_selectedDate != null &&
-                                    _selectedDate!.year ==
-                                        DateTime.now().year &&
-                                    _selectedDate!.month ==
-                                        DateTime.now().month &&
-                                    _selectedDate!.day == DateTime.now().day &&
-                                    DateTime.now().hour >= 9),
+                            enabled: !_blockedShifts.contains(AppointmentShift.morning) && 
+                                     !_fullShifts.contains(AppointmentShift.morning),
                           ),
                           ButtonSegment<AppointmentShift>(
                             value: AppointmentShift.afternoon,
                             label: const Text('Tarde'),
-                            enabled:
-                                !(_selectedDate != null &&
-                                    _selectedDate!.year ==
-                                        DateTime.now().year &&
-                                    _selectedDate!.month ==
-                                        DateTime.now().month &&
-                                    _selectedDate!.day == DateTime.now().day &&
-                                    DateTime.now().hour >= 14),
+                            enabled: !_blockedShifts.contains(AppointmentShift.afternoon) && 
+                                     !_fullShifts.contains(AppointmentShift.afternoon),
                           ),
                         ],
                         selected: {_selectedShift},
@@ -1186,7 +1211,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                             ? null
                             : (selected) {
                                 final next = selected.first;
-                                if (next == _selectedShift) return;
+                                if (next == _selectedShift) {
+                                  return;
+                                }
                                 setState(() {
                                   _selectedShift = next;
                                   _dateAvailabilityCalculated = false;

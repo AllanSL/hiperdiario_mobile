@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/data/medication_repository.dart';
-import '../core/widgets/app_input_decoration.dart';
+import '../../core/data/medication_repository.dart';
+import '../../core/widgets/app_input_decoration.dart';
 
 class SupabaseMedicationsPage extends StatefulWidget {
   const SupabaseMedicationsPage({super.key});

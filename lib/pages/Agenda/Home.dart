@@ -2,21 +2,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
-import '../core/services/notification_service.dart';
+import '../../core/services/notification_service.dart';
 
-import '../state/app_state.dart';
-import '../core/providers/theme_provider.dart';
-import 'appointments_page.dart';
-import 'appointment_history_page.dart';
-import 'medications_page.dart';
-import 'profile_page.dart';
-import 'add_medication_page.dart';
-import 'add_appointment_page.dart';
-import 'settings_page.dart';
-import 'health_tips_page.dart';
+import '../../state/app_state.dart';
+import '../../core/providers/theme_provider.dart';
+import 'Consultas.dart';
+import 'HistoricoConsultas.dart';
+import '../Medicamentos/Medicamentos.dart';
+import '../Perfil/Perfil.dart';
+import '../Medicamentos/NovoMedicamento.dart';
+import 'NovaConsulta.dart';
+import '../Perfil/Configuracoes.dart';
+import '../Dicas/DicasSaude.dart';
 
 // Classes exportadas de profile_page.dart
-export 'profile_page.dart'
+export '../Perfil/Perfil.dart'
     show EditPersonalContactsPage, EditEmergencyContactPage, QrProfilePage;
 
 class HomePage extends StatefulWidget {

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/models/medication.dart';
-import '../state/app_state.dart';
-import 'add_medication_page.dart';
+import '../../core/models/medication.dart';
+import '../../state/app_state.dart';
+import 'NovoMedicamento.dart';
 
 class MedicationsPage extends StatelessWidget {
   const MedicationsPage({super.key});

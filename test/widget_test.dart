@@ -12,7 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hiperdiario/core/providers/accessibility_provider.dart';
 import 'package:hiperdiario/core/providers/theme_provider.dart';
 import 'package:hiperdiario/app_paciente.dart';
-import 'package:hiperdiario/pages/login_page.dart';
+import 'package:hiperdiario/pages/Autenticacao/Login.dart';
 import 'package:hiperdiario/state/app_state.dart';
 
 void main() {
