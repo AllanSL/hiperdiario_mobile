@@ -145,34 +145,32 @@ class _AppointmentCard extends StatelessWidget {
                                   : colorScheme.onSurface,
                             ),
                           ),
+                          if (isToday) ...[
+                            const SizedBox(width: 8),
+                            _Badge(
+                              label: 'HOJE',
+                              color: Colors.orange,
+                              filled: true,
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Chip(
-                        visualDensity: VisualDensity.compact,
-                        label: Text('Turno: ${appointment.shift.label}'),
+                      Row(
+                        children: [
+                          _Badge(
+                            label: 'TURNO: ${appointment.shift.label}',
+                            color: colorScheme.onSurfaceVariant,
+                            filled: true,
+                            stadium: true,
+                          ),
+                          const SizedBox(width: 8),
+                          _StatusBadge(appointment: appointment),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                if (isToday)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'HOJE',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 PopupMenuButton(
                   iconColor: colorScheme.primary,
                   itemBuilder: (context) => [
@@ -460,4 +458,114 @@ int _shiftOrder(AppointmentShift shift) {
     AppointmentShift.morning => 0,
     AppointmentShift.afternoon => 1,
   };
+}
+
+class _StatusBadge extends StatelessWidget {
+  final Appointment appointment;
+
+  const _StatusBadge({required this.appointment});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
+    final status = appointment.status?.toLowerCase() ?? '';
+    final shift = appointment.shift;
+    final now = DateTime.now();
+
+    String label = 'Agendada';
+    Color color = Colors.grey;
+
+    // Lógica de "Faltou" por tempo expirado (mesma da Web)
+    bool isMissed = false;
+    final aptDate = appointment.dateTime;
+    final today = DateTime(now.year, now.month, now.day);
+    final checkDate = DateTime(aptDate.year, aptDate.month, aptDate.day);
+
+    if (status == 'scheduled' || status == '') {
+      if (checkDate.isBefore(today)) {
+        isMissed = true;
+      } else if (checkDate.isAtSameMomentAs(today)) {
+        if (shift == AppointmentShift.morning && now.hour >= 13) {
+          isMissed = true;
+        } else if (shift == AppointmentShift.afternoon && now.hour >= 17) {
+          isMissed = true;
+        }
+      }
+    }
+
+    if (isMissed || status == 'missed' || status == 'faltou') {
+      label = 'Faltou';
+      color = Colors.red;
+    } else if (status == 'attended' || status == 'compareceu') {
+      label = 'Atendido';
+      color = Colors.green;
+    } else if (status == 'checked_in' || status.contains('fila')) {
+      label = 'Na Fila';
+      color = Colors.blue;
+    } else if (status == 'in_progress') {
+      label = 'Em Atendimento';
+      color = Colors.amber;
+    } else if (status == 'cancel') {
+      label = 'Cancelada';
+      color = Colors.orange;
+    }
+
+    final f = (theme.iconTheme.size ?? 24.0) / 24.0;
+
+    return _Badge(
+      label: label,
+      color: color,
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool filled;
+  final bool stadium;
+
+  const _Badge({
+    required this.label,
+    required this.color,
+    this.filled = false,
+    this.stadium = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final f = (theme.iconTheme.size ?? 24.0) / 24.0;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8 * f, vertical: 4 * f),
+      decoration: BoxDecoration(
+        color: filled
+            ? (stadium ? theme.colorScheme.surfaceContainerHighest : color)
+            : color.withValues(alpha: 0.1),
+        borderRadius: stadium
+            ? BorderRadius.circular(100)
+            : BorderRadius.circular(8 * f),
+        border: Border.all(
+          color: stadium
+              ? Colors.transparent
+              : (filled ? color : color.withValues(alpha: 0.8)),
+          width: 1 * f,
+        ),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: textTheme.labelMedium?.copyWith(
+          color: stadium
+              ? theme.colorScheme.onSurfaceVariant
+              : (filled ? Colors.white : color),
+          fontWeight: FontWeight.bold,
+          fontSize: (textTheme.labelMedium?.fontSize ?? 14) * 0.85,
+        ),
+      ),
+    );
+  }
 }

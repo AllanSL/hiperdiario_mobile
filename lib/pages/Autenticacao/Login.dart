@@ -297,7 +297,11 @@ class _LoginPageState extends State<LoginPage> {
       } else if (normalized.contains('acesso negado') ||
           normalized.contains('exclusivo para pacientes')) {
         msg = 'Credenciais inválidas. Verifique seu CPF e senha.';
-        shortCpfMsg = 'Credenciais inválidas';
+        shortCpfMsg = 'Acesso negado';
+        shortPasswordMsg = null;
+      } else if (normalized.contains('perfil de paciente não encontrado')) {
+        msg = 'Seu perfil de paciente ainda não foi criado. Entre em contato com a recepção da UBS.';
+        shortCpfMsg = 'Perfil não encontrado';
         shortPasswordMsg = null;
       } else if (normalized.contains('invalid credentials') ||
           normalized.contains('invalid login credentials') ||

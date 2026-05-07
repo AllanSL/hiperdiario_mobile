@@ -154,7 +154,12 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 8),
         _SectionTitle('Condições registradas'),
         const SizedBox(height: 4),
-        _ChipsCard(items: p.diseases),
+        // Se vazio exibir "Nenhuma condição registrada"
+        if (p.diseases.isEmpty) ...[
+          _ChipsCard(items: ["Nenhuma condição registrada"]),
+        ] else ...[
+          _ChipsCard(items: p.diseases),
+        ],
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -175,9 +180,12 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 4),
         _InfoCard(
           rows: [
+            // Telefone
             _InfoRow.compact(formatPhoneDisplay(p.contact), icon: Icons.phone),
+            // Email
             if (p.email != null && p.email!.isNotEmpty)
               _InfoRow.compact(p.email!, icon: Icons.email),
+            // UBS
             _InfoRow.compact(
               // Exibe nome formatado da UBS quando disponível; caso contrário,
               // mostramos um placeholder amigável para indicar que não há UBS.
@@ -189,8 +197,9 @@ class ProfilePage extends StatelessWidget {
               })(),
               icon: Icons.local_hospital,
             ),
-            if (p.address != null && p.address!.isNotEmpty)
-              _InfoRow.compact(p.address!, icon: Icons.home),
+            // Endereço
+            if (p.fullAddress != null && p.fullAddress!.isNotEmpty)
+              _InfoRow.compact(p.fullAddress!, icon: Icons.home),
           ],
         ),
         const SizedBox(height: 12),
@@ -1695,7 +1704,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
           child: ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
-              if (p.address != null && p.address!.isNotEmpty)
+              if (p.fullAddress != null && p.fullAddress!.isNotEmpty)
                 Card(
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   child: Padding(
@@ -1725,7 +1734,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
                         _buildReadOnlyField(
                           icon: Icons.home,
                           label: 'Endereço',
-                          value: p.address!,
+                          value: p.fullAddress!,
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -1742,7 +1751,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
                     ),
                   ),
                 ),
-              if (p.address != null && p.address!.isNotEmpty)
+              if (p.fullAddress != null && p.fullAddress!.isNotEmpty)
                 const SizedBox(height: 24),
               Text(
                 'Seus contatos',
@@ -2334,7 +2343,7 @@ class _EditEmergencyContactPageState extends State<EditEmergencyContactPage> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Telefone é obrigatório';
                     }
-                    final digitsOnly = value.replaceAll(RegExp(r'D'), '');
+                    final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
                     if (digitsOnly.length < 10) {
                       return 'Telefone deve ter pelo menos 10 dígitos';
                     }
@@ -2435,7 +2444,7 @@ class _EditEmergencyContactPageState extends State<EditEmergencyContactPage> {
     final app = context.read<AppState>();
 
     final emergencyPhoneDigits = _emergencyPhone.text.replaceAll(
-      RegExp(r'D'),
+      RegExp(r'\D'),
       '',
     );
 

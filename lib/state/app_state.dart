@@ -86,44 +86,39 @@ class AppState extends ChangeNotifier {
     if (!_isValidCpf(cleanCpf)) {
       throw Exception('CPF inválido. Verifique e tente novamente.');
     }
-    final email = _cpfToEmail(cleanCpf);
+
     _isAuthenticating = true;
     notifyListeners();
 
     try {
-      await _supabase.auth.signInWithPassword(email: email, password: password);
+      // 1. Tentar obter o e-mail real associado a este CPF via Edge Function
+      String authEmail;
+      try {
+        final response = await _supabase.functions.invoke(
+          'manage-patient-auth',
+          body: {'action': 'check', 'cpf': cleanCpf},
+        );
 
-      // Verifica se o usuário autenticado possui um perfil de paciente
-      final user = _supabase.auth.currentUser;
-      if (user != null) {
-        final patientExists = await _supabase
-            .from('patients')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-        if (patientExists == null) {
-          // Verifica se é um profissional (para dar erro específico)
-          final profExists = await _supabase
-              .from('professionals')
-              .select('user_id')
-              .eq('user_id', user.id)
-              .maybeSingle();
-
-          if (profExists != null) {
-            await logout();
-            throw Exception(
-              'Acesso negado. Este aplicativo é exclusivo para pacientes.',
-            );
-          } else {
-            // Se não é paciente nem profissional cadastrado, desloga para evitar estado inconsistente
-            await logout();
-            throw Exception(
-              'Perfil de paciente não encontrado. Entre em contato com a recepção.',
-            );
-          }
+        if (response.status == 200 && response.data['email'] != null) {
+          authEmail = response.data['email'];
+        } else {
+          // Se não encontrado ou erro, usar o padrão
+          authEmail = _cpfToEmail(cleanCpf);
         }
+      } catch (e) {
+        // Fallback para o padrão em caso de erro na função
+        authEmail = _cpfToEmail(cleanCpf);
       }
+
+      await _supabase.auth.signInWithPassword(
+        email: authEmail,
+        password: password,
+      );
+      await _loadDataAndSchedule();
+    } on AuthException catch (e) {
+      _isLogged = false;
+      _patient = null;
+      rethrow;
     } catch (e) {
       _isLogged = false;
       _patient = null;
@@ -159,104 +154,59 @@ class AppState extends ChangeNotifier {
     if (!_isValidCpf(cleanCpf)) {
       throw Exception('CPF inválido. Verifique e tente novamente.');
     }
-    final authEmail = _cpfToEmail(cleanCpf);
 
     _isAuthenticating = true;
     notifyListeners();
 
     try {
-      AuthResponse signUpResponse;
-      try {
-        signUpResponse = await _supabase.auth.signUp(
-          email: authEmail,
-          password: password,
-          data: {'full_name': name, 'cpf': cleanCpf},
-        );
-      } on AuthException catch (e) {
-        if (e.code == 'over_email_send_rate_limit') {
-          throw Exception(
-            'Limite de envio de e-mails atingido. Aguarde alguns minutos e tente novamente.',
-          );
-        }
-        if (e.code == 'user_already_exists' || e.code == 'email_exists') {
-          try {
-            await _supabase.auth.signInWithPassword(
-              email: authEmail,
-              password: password,
-            );
-          } on AuthException catch (signInError) {
-            if (signInError.code == 'invalid_credentials') {
-              throw Exception(
-                'CPF já cadastrado. Faça login ou recupere a senha.',
-              );
-            }
-            rethrow;
-          }
-          final existingUserId = _supabase.auth.currentUser?.id;
-          if (existingUserId == null) {
-            throw Exception('Não foi possível obter o usuário após login');
-          }
-          await _upsertUserProfile(
-            userId: existingUserId,
-            payload: _buildUserPayload(
-              userId: existingUserId,
-              name: name,
-              cleanCpf: cleanCpf,
-              birthDate: birthDate,
-              gender: gender,
-              diseases: diseases,
-              phone: phone,
-              email: email,
-              emergencyContactName: emergencyContactName,
-              emergencyContactPhone: emergencyContactPhone,
-              emergencyContactRelationship: emergencyContactRelationship,
-              uf: uf,
-              municipioIbge: municipioIbge,
-              ubsCnes: ubsCnes,
-              zipCode: zipCode,
-              street: street,
-              number: number,
-              neighborhood: neighborhood,
-              complement: complement,
-            ),
-            allowUpdateExisting: false,
-          );
-          await _loadDataAndSchedule();
-          return;
-        }
-        rethrow;
-      }
-
-      final userId = signUpResponse.user?.id ?? _supabase.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception('Não foi possível obter o usuário após cadastro');
-      }
-
-      await _upsertUserProfile(
-        userId: userId,
-        payload: _buildUserPayload(
-          userId: userId,
-          name: name,
-          cleanCpf: cleanCpf,
-          birthDate: birthDate,
-          gender: gender,
-          diseases: diseases,
-          phone: phone,
-          email: email,
-          emergencyContactName: emergencyContactName,
-          emergencyContactPhone: emergencyContactPhone,
-          emergencyContactRelationship: emergencyContactRelationship,
-          uf: uf,
-          municipioIbge: municipioIbge,
-          ubsCnes: ubsCnes,
-          zipCode: zipCode,
-          street: street,
-          number: number,
-          neighborhood: neighborhood,
-          complement: complement,
-        ),
-        allowUpdateExisting: false,
+      // 1. Chamar a Edge Function para lidar com a criação/vínculo do usuário e registro do paciente
+      final response = await _supabase.functions.invoke(
+        'manage-patient-auth',
+        body: {
+          'action': 'create',
+          'cpf': cleanCpf,
+          'password': password,
+          'patientData': {
+            'name': name,
+            'birth_date': _formatDateToIso(birthDate),
+            'gender': gender,
+            'diseases': diseases,
+            'phone': phone?.replaceAll(RegExp(r'\D'), ''),
+            'email': email,
+            'emergency_contact': {
+              'name': emergencyContactName,
+              'phone': emergencyContactPhone?.replaceAll(RegExp(r'\D'), ''),
+              'relationship': emergencyContactRelationship,
+            },
+            'state_code': uf,
+            'city_ibge':
+                municipioIbge != null ? int.tryParse(municipioIbge) : null,
+            'ubs_cnes': ubsCnes,
+            'zip_code': zipCode,
+            'street': street,
+            'number': number,
+            'neighborhood': neighborhood,
+            'complement': complement,
+          },
+        },
       );
+
+      if (response.status != 200) {
+        final errorMsg = response.data['error'] ?? 'Erro no cadastro';
+        throw Exception(errorMsg);
+      }
+
+      final authEmail = response.data['email'];
+      if (authEmail == null) {
+        throw Exception('Não foi possível obter o e-mail para login após cadastro');
+      }
+
+      // 2. Realizar login com o e-mail retornado pela função (pode ser o existente ou o novo)
+      await _supabase.auth.signInWithPassword(
+        email: authEmail,
+        password: password,
+      );
+
       await _loadDataAndSchedule();
     } finally {
       _isAuthenticating = false;
@@ -331,113 +281,6 @@ class AppState extends ChangeNotifier {
         'Ocorreu um erro ao recuperar a senha. Verifique os dados e tente novamente.',
       );
     }
-  }
-
-  Map<String, dynamic> _buildUserPayload({
-    required String userId,
-    required String name,
-    required String cleanCpf,
-    String? birthDate,
-    String? gender,
-    List<String> diseases = const <String>[],
-    String? phone,
-    String? email,
-    String? emergencyContactName,
-    String? emergencyContactPhone,
-    String? emergencyContactRelationship,
-    String? uf,
-    String? municipioIbge,
-    String? ubsCnes,
-    String? zipCode,
-    String? street,
-    String? number,
-    String? neighborhood,
-    String? complement,
-  }) {
-    final parsedBirthDate = _parseDate(birthDate);
-    final municipio = int.tryParse((municipioIbge ?? '').trim());
-    final normalizedDiseases = diseases
-        .map((d) => d.trim())
-        .where((d) => d.isNotEmpty)
-        .toList();
-
-    final emergencyName = (emergencyContactName ?? '').trim();
-    final emergencyPhone = (emergencyContactPhone ?? '').trim();
-    final emergencyRelationship = (emergencyContactRelationship ?? '').trim();
-
-    Map<String, dynamic>? emergencyContact;
-    if (emergencyName.isNotEmpty && emergencyPhone.isNotEmpty) {
-      emergencyContact = {
-        'name': emergencyName,
-        'phone': emergencyPhone,
-        'relationship': emergencyRelationship.isEmpty
-            ? 'Contato de emergência'
-            : emergencyRelationship,
-      };
-    }
-
-    final payload = <String, dynamic>{
-      'user_id': userId,
-      'name': name.trim(),
-      'cpf': cleanCpf,
-      'birth_date': parsedBirthDate?.toIso8601String(),
-      'gender': (gender ?? '').trim().isEmpty ? null : gender?.trim(),
-      'diseases': normalizedDiseases.isEmpty ? null : normalizedDiseases,
-      'phone': (phone ?? '').trim().isEmpty ? null : phone?.trim(),
-      'email': (email ?? '').trim().isEmpty ? null : email?.trim(),
-      'emergency_contact': emergencyContact,
-      'state_code': (uf ?? '').trim().isEmpty ? null : uf?.trim().toUpperCase(),
-      'city_ibge': municipio,
-      'ubs_cnes': (ubsCnes ?? '').trim().isEmpty ? null : ubsCnes?.trim(),
-      'zip_code': (zipCode ?? '').trim().isEmpty ? null : zipCode?.trim(),
-      'street': (street ?? '').trim().isEmpty ? null : street?.trim(),
-      'number': (number ?? '').trim().isEmpty ? null : number?.trim(),
-      'neighborhood':
-          (neighborhood ?? '').trim().isEmpty ? null : neighborhood?.trim(),
-      'complement':
-          (complement ?? '').trim().isEmpty ? null : complement?.trim(),
-    };
-
-    // remove nulls to avoid overriding defaults
-    payload.removeWhere((key, value) => value == null);
-    return payload;
-  }
-
-  Future<void> _upsertUserProfile({
-    required String userId,
-    required Map<String, dynamic> payload,
-    bool allowUpdateExisting = true,
-  }) async {
-    final existingByRemote = await _supabase
-        .from('patients')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-    if (existingByRemote != null) {
-      if (!allowUpdateExisting) {
-        throw Exception('CPF já cadastrado. Faça login ou recupere a senha.');
-      }
-      await _supabase
-          .from('patients')
-          .update(payload)
-          .eq('id', existingByRemote['id']);
-      return;
-    }
-
-    final cpf = payload['cpf'] as String?;
-    if (cpf != null && cpf.isNotEmpty) {
-      final existingByCpf = await _supabase
-          .from('patients')
-          .select('id, user_id')
-          .eq('cpf', cpf)
-          .maybeSingle();
-      if (existingByCpf != null) {
-        throw Exception('CPF já cadastrado. Faça login ou recupere a senha.');
-      }
-    }
-
-    await _supabase.from('patients').insert(payload);
   }
 
   DateTime? _parseDate(String? value) {
@@ -547,16 +390,24 @@ class AppState extends ChangeNotifier {
           'Profissional detectado no mobile sem perfil de paciente. Forçando logout.',
         );
         await logout();
-        return;
+        throw Exception(
+          'Acesso negado. Este aplicativo é exclusivo para pacientes.',
+        );
+      } else {
+        debugPrint('Usuário logado sem perfil de paciente e sem ser profissional.');
+        await logout();
+        throw Exception(
+          'Perfil de paciente não encontrado. Entre em contato com a recepção.',
+        );
       }
     }
 
     String? nomeMunicipio;
-    final municipioRaw = profile?['city_ibge'];
+    final municipioRaw = profile['city_ibge'];
     final codigoMunicipio = municipioRaw is int
         ? municipioRaw
         : int.tryParse('${municipioRaw ?? ''}');
-    final siglaUf = profile?['state_code']?.toString();
+    final siglaUf = profile['state_code']?.toString();
     final codigoUf = _resolveCodigoUf(siglaUf);
 
     if (codigoMunicipio != null && siglaUf != null && codigoUf != null) {
@@ -570,8 +421,8 @@ class AppState extends ChangeNotifier {
       } catch (_) {}
     }
 
-    String? ubsName = profile?['ubs_name']?.toString().trim();
-    final ubsCnes = profile?['ubs_cnes']?.toString();
+    String? ubsName = profile['ubs_name']?.toString().trim();
+    final ubsCnes = profile['ubs_cnes']?.toString();
     if ((ubsName == null || ubsName.isEmpty) &&
         ubsCnes != null &&
         ubsCnes.trim().isNotEmpty) {
@@ -829,7 +680,12 @@ class AppState extends ChangeNotifier {
     if (value == null) return null;
     if (value is DateTime) return value.toLocal();
     if (value is String && value.trim().isNotEmpty) {
-      return DateTime.tryParse(value)?.toLocal();
+      final trimmed = value.trim();
+      // Se for apenas data (YYYY-MM-DD), não usamos toLocal() para evitar deslocamento de fuso
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) {
+        return DateTime.tryParse(trimmed);
+      }
+      return DateTime.tryParse(trimmed)?.toLocal();
     }
     return null;
   }
@@ -964,6 +820,7 @@ class AppState extends ChangeNotifier {
                 : AppointmentShift.morning),
       notes: row['notes']?.toString(),
       attended: attended,
+      status: status,
     );
   }
 
@@ -1294,7 +1151,9 @@ class AppState extends ChangeNotifier {
 
     // Preparar os dados para atualizacao no Supabase
     final payload = <String, dynamic>{};
-    if (contact != null) payload['phone'] = contact;
+    if (contact != null) {
+      payload['phone'] = contact.replaceAll(RegExp(r'\D'), '');
+    }
     if (ubs != null) {
       payload['ubs_cnes'] = ubs;
       if (ubsName != null) payload['ubs_name'] = ubsName;
@@ -1308,7 +1167,7 @@ class AppState extends ChangeNotifier {
     } else if (emergencyContact != null) {
       payload['emergency_contact'] = {
         'name': emergencyContact.name,
-        'phone': emergencyContact.phone,
+        'phone': emergencyContact.phone.replaceAll(RegExp(r'\D'), ''),
         'relationship': emergencyContact.relationship,
       };
     }
@@ -1679,5 +1538,18 @@ class AppState extends ChangeNotifier {
     if (days > 14) days = 14;
     _lowStockDaysThreshold = days;
     notifyListeners();
+  }
+
+  String? _formatDateToIso(String? date) {
+    if (date == null || date.isEmpty) return null;
+    final parts = date.split('/');
+    if (parts.length == 3) {
+      // Assumindo DD/MM/YYYY
+      final day = parts[0].padLeft(2, '0');
+      final month = parts[1].padLeft(2, '0');
+      final year = parts[2];
+      return '$year-$month-$day';
+    }
+    return date; // Fallback se não for no formato esperado
   }
 }
