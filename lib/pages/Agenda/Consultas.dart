@@ -353,45 +353,6 @@ class _AppointmentCard extends StatelessWidget {
                 ],
               ),
             ],
-
-            if (appointment.attended != null) ...[
-              const Divider(height: 24),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: appointment.attended!
-                      ? Colors.green.shade50
-                      : Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: appointment.attended!
-                        ? Colors.green.shade300
-                        : Colors.red.shade300,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      appointment.attended! ? Icons.check_circle : Icons.cancel,
-                      color: appointment.attended! ? Colors.green : Colors.red,
-                      size: smallIconSize,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        appointment.attended! ? 'Compareceu' : 'Não compareceu',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: appointment.attended!
-                              ? Colors.green.shade900
-                              : Colors.red.shade900,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -563,7 +524,7 @@ class _Badge extends StatelessWidget {
               ? theme.colorScheme.onSurfaceVariant
               : (filled ? Colors.white : color),
           fontWeight: FontWeight.bold,
-          fontSize: (textTheme.labelMedium?.fontSize ?? 14) * 0.85,
+          fontSize: (textTheme.labelMedium?.fontSize ?? 14) * 0.75,
         ),
       ),
     );
