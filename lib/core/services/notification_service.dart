@@ -211,45 +211,46 @@ class NotificationService {
   Future<void> scheduleAppointmentReminders(Appointment appt) async {
     // Web não suporta flutter_local_notifications
     if (kIsWeb) return;
-    // Agenda 1 dia antes e 1 hora antes, usando um horário-base do turno.
-    final appointmentDateTime = _appointmentDateTimeForShift(appt);
-    final oneDayBefore = appointmentDateTime.subtract(const Duration(days: 1));
-    final oneHourBefore = appointmentDateTime.subtract(
-      const Duration(hours: 1),
+
+    final now = DateTime.now();
+
+    // 1. Notificação 1 dia antes às 07:00
+    final oneDayBefore = DateTime(
+      appt.dateTime.year,
+      appt.dateTime.month,
+      appt.dateTime.day - 1,
+      7,
+      0,
     );
 
-    if (oneDayBefore.isAfter(DateTime.now())) {
-      await _zonedSchedule(
-        id: _randomId(),
-        title: 'Consulta amanhã',
-        body:
-            'Você tem consulta em ${appt.location} às ${_fmtTime(appointmentDateTime)}.',
-        when: oneDayBefore,
-      );
-    }
-    if (oneHourBefore.isAfter(DateTime.now())) {
-      await _zonedSchedule(
-        id: _randomId(),
-        title: 'Consulta em 1 hora',
-        body:
-            'Não esqueça: consulta em ${appt.location} às ${_fmtTime(appointmentDateTime)}.',
-        when: oneHourBefore,
-      );
-    }
-  }
-
-  DateTime _appointmentDateTimeForShift(Appointment appt) {
-    final hour = switch (appt.shift) {
-      AppointmentShift.morning => 8,
-      AppointmentShift.afternoon => 13,
-    };
-    return DateTime(
+    // 2. Notificação no dia da consulta às 07:00
+    final sameDay = DateTime(
       appt.dateTime.year,
       appt.dateTime.month,
       appt.dateTime.day,
-      hour,
+      7,
       0,
     );
+
+    if (oneDayBefore.isAfter(now)) {
+      await _zonedSchedule(
+        id: _randomId(),
+        title: 'Lembrete de Consulta',
+        body:
+            'Amanhã você tem consulta em ${appt.location} no turno da ${appt.shift.label.toLowerCase()}.',
+        when: oneDayBefore,
+      );
+    }
+
+    if (sameDay.isAfter(now)) {
+      await _zonedSchedule(
+        id: _randomId(),
+        title: 'Consulta Hoje',
+        body:
+            'Hoje você tem consulta em ${appt.location} no turno da ${appt.shift.label.toLowerCase()}.',
+        when: sameDay,
+      );
+    }
   }
 
   Future<void> scheduleMedicationReminders(Medication med) async {
