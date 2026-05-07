@@ -120,7 +120,7 @@ class _HistoryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cabeçalho: Data e Hora
+            // Cabeçalho: Data e Turno
             Row(
               children: [
                 Icon(

@@ -73,6 +73,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     _locationController = TextEditingController(text: appt?.location ?? '');
     _specialtyController = TextEditingController(text: appt?.specialty ?? '');
     _notesController = TextEditingController(text: appt?.notes ?? '');
+    _locationFixa = appt != null;
 
     _locationController.addListener(_onLocationChanged);
     _locationFocusNode.addListener(_onFocusChanged);
@@ -170,6 +171,11 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
               est.codigoCnes.toString() == appointmentLocation) {
             _estabelecimenteSelecionado = est;
             _carregarEspecialidades(est, initial: true);
+            
+            // Atualiza o controller com o nome da unidade em vez do código CNES
+            _locationController.removeListener(_onLocationChanged);
+            _locationController.text = est.nomeFantasia;
+            _locationController.addListener(_onLocationChanged);
             break;
           }
         }

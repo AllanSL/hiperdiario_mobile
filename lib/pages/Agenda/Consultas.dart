@@ -98,10 +98,19 @@ class _AppointmentCard extends StatelessWidget {
 
     final dateFormat = DateFormat('dd/MM/yyyy');
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final isToday =
         appointment.dateTime.year == now.year &&
         appointment.dateTime.month == now.month &&
         appointment.dateTime.day == now.day;
+    
+    // Só pode editar se for pelo menos 1 dia antes da consulta (amanhã em diante)
+    final appointmentDateOnly = DateTime(
+      appointment.dateTime.year,
+      appointment.dateTime.month,
+      appointment.dateTime.day,
+    );
+    final canEdit = appointmentDateOnly.isAfter(today);
 
     return Card(
       elevation: 2,
@@ -119,7 +128,7 @@ class _AppointmentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cabeçalho: Data e Hora — layout responsivo com Wrap
+            // Cabeçalho: Data e Turno — layout responsivo com Wrap
             Row(
               children: [
                 Expanded(
@@ -174,25 +183,26 @@ class _AppointmentCard extends StatelessWidget {
                 PopupMenuButton(
                   iconColor: colorScheme.primary,
                   itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.edit,
-                            size: smallIconSize,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Editar',
-                            style: textTheme.bodyMedium?.copyWith(
+                    if (canEdit)
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.edit,
+                              size: smallIconSize,
                               color: colorScheme.primary,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Text(
+                              'Editar',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                     PopupMenuItem(
                       value: 'delete',
                       child: Row(
