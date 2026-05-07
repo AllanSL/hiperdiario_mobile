@@ -478,6 +478,7 @@ class _StatusBadge extends StatelessWidget {
     return _Badge(
       label: label,
       color: color,
+      stadium: true,
     );
   }
 }
@@ -524,7 +525,7 @@ class _Badge extends StatelessWidget {
               ? theme.colorScheme.onSurfaceVariant
               : (filled ? Colors.white : color),
           fontWeight: FontWeight.bold,
-          fontSize: (textTheme.labelMedium?.fontSize ?? 14) * 0.75,
+          fontSize: (textTheme.labelMedium?.fontSize ?? 14) * 0.7,
         ),
       ),
     );

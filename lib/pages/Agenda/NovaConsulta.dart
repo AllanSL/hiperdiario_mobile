@@ -151,7 +151,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           if ((codigoUbs != null && est.codigoCnes == codigoUbs) ||
               est.nomeFantasia.toLowerCase() == patient.ubs.toLowerCase()) {
             _estabelecimenteSelecionado = est;
-            _carregarEspecialidades(est);
+            _carregarEspecialidades(est, initial: true);
 
             if (_locationController.text.isEmpty) {
               _locationController.removeListener(_onLocationChanged);
@@ -169,7 +169,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
           if (est.nomeFantasia.toLowerCase() == appointmentLocation ||
               est.codigoCnes.toString() == appointmentLocation) {
             _estabelecimenteSelecionado = est;
-            _carregarEspecialidades(est);
+            _carregarEspecialidades(est, initial: true);
             break;
           }
         }
@@ -235,7 +235,8 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     }
   }
 
-  Future<void> _carregarEspecialidades(CnesEstabelecimento est) async {
+  Future<void> _carregarEspecialidades(CnesEstabelecimento est,
+      {bool initial = false}) async {
     final codigoUf = context.read<AppState>().patient?.codigoUf;
     final codigoMunicipio = context.read<AppState>().patient?.codigoMunicipio;
     if (codigoUf == null || codigoMunicipio == null) return;
@@ -246,7 +247,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       _especialidadesCarregando = true;
       _todosProfissionais = [];
       _profissionaisFiltrados = [];
-      _specialtyController.clear();
+      if (!initial) {
+        _specialtyController.clear();
+      }
     });
 
     final profList = await CnesService.buscarProfissionais(
@@ -505,15 +508,6 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         _dateFieldKey.currentState?.validate();
       });
       await _refreshDateAvailability();
-      if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0) {
-        if (_isDateBlocked) {
-          _showToast('Atendimento suspenso. Escolha outra data.');
-        } else if (_isDateFull) {
-          _showToast('Manhã lotada para esta data. Tente o turno da tarde.');
-        } else {
-          _showToast('Sem vagas para este turno. Tente trocar o turno.');
-        }
-      }
     }
   }
 
@@ -538,13 +532,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     setState(() {
       _isDateLoading = true;
       _dateAvailabilityCalculated = false;
-      _isDateBlocked = false;
-      _isDateFull = false;
-      _dailyCapacity = null;
-      _appointmentsCount = 0;
-      _dateAvailabilityLabel = null;
-      _blockedShifts = {};
-      _fullShifts = {};
+      // Mantemos _blockedShifts e _fullShifts anteriores para evitar flicker nos botões
     });
 
     final date = _selectedDate!;
@@ -590,23 +578,27 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
               : _specialtyController.text.trim());
       final profCns = _profissionalSelecionado?.id;
 
-      // 2. Buscar todos os bloqueios do dia
-      var blockedQuery = Supabase.instance.client
+      // 2. Buscar todos os bloqueios do dia (da unidade e do profissional)
+      final blockedResp = await Supabase.instance.client
           .from('blocked_times')
-          .select('shift')
+          .select('shift, professional_cns')
           .eq('cnes_id', cnes)
           .gte('date_time', dataInicio)
           .lte('date_time', dataFim);
 
-      if (profCns != null) {
-        blockedQuery = blockedQuery.eq('professional_cns', profCns);
-      } else {
-        blockedQuery = blockedQuery.eq('specialty', spec);
-      }
-
-      final blockedResp = await blockedQuery;
       Set<AppointmentShift> dbBlocked = {};
       for (final b in blockedResp) {
+        final bProfCns = b['professional_cns'] as String?;
+        
+        // Um bloqueio é relevante se for da unidade toda (profCns null) 
+        // ou se for específico para o profissional selecionado
+        bool isRelevant = bProfCns == null; 
+        if (!isRelevant && profCns != null) {
+          isRelevant = bProfCns == profCns;
+        }
+
+        if (!isRelevant) continue;
+
         final s = (b['shift'] as String?)?.toLowerCase();
         if (s == null) continue;
         
@@ -682,7 +674,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         _appointmentsCount = counts[_selectedShift] ?? 0;
         _dateAvailabilityCalculated = true;
 
-        if (currentBlocked) {
+        if (isBlockedMorning && isBlockedAfternoon) {
+          _dateAvailabilityLabel = 'Dia indisponível';
+        } else if (currentBlocked) {
           _dateAvailabilityLabel = 'Turno indisponível';
         } else if (currentFull) {
           _dateAvailabilityLabel = 'Turno lotado';

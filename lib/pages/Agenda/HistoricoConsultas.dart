@@ -98,11 +98,11 @@ class _HistoryCard extends StatelessWidget {
     if (appointment.attended == true) {
       statusColor = Colors.green;
       statusIcon = Icons.check_circle;
-      statusText = 'Compareceu';
+      statusText = 'Atendido';
     } else if (appointment.attended == false) {
       statusColor = Colors.red;
       statusIcon = Icons.cancel;
-      statusText = 'Não compareceu';
+      statusText = 'Faltou';
     } else {
       statusColor = Colors.grey;
       statusIcon = Icons.help_outline;
