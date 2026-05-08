@@ -327,7 +327,6 @@ class _HomePageState extends State<HomePage> {
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu),
-            tooltip: 'Menu',
             onPressed: () {
               final scaffold = Scaffold.of(ctx);
               if (scaffold.hasDrawer && scaffold.isDrawerOpen) {
@@ -349,9 +348,6 @@ class _HomePageState extends State<HomePage> {
             builder: (context, themeProvider, _) {
               final isDark = themeProvider.isDark(context);
               return IconButton(
-                tooltip: isDark
-                    ? 'Mudar para tema claro'
-                    : 'Mudar para tema escuro',
                 icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
                 onPressed: () => themeProvider.toggle(context),
               );
@@ -361,7 +357,6 @@ class _HomePageState extends State<HomePage> {
             Tooltip(
               message: 'Ajustar dias para aviso de estoque baixo',
               child: IconButton(
-                tooltip: 'Configurar alerta de estoque',
                 onPressed: () => _configureLowStock(context),
                 icon: const Icon(Icons.notifications_active),
               ),
@@ -370,7 +365,7 @@ class _HomePageState extends State<HomePage> {
             Tooltip(
               message: 'Atualizar medicamentos da UBS',
               child: IconButton(
-                tooltip: 'Atualizar medicamentos da UBS',
+                
                 onPressed: () async {
                   AppSnackBar.showSuccess(context, 'Buscando atualizações na UBS');
                   await context.read<AppState>().syncUbsData();

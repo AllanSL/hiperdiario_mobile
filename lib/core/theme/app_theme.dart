@@ -111,6 +111,11 @@ class AppTheme {
           color: Colors.black87,
         ),
       ),
+      popupMenuTheme: PopupMenuThemeData(
+        menuPadding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 4,
+      ),
     );
   }
 
@@ -211,6 +216,11 @@ class AppTheme {
           fontSize: baseBodyMedium,
           color: colorScheme.onSurface,
         ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        menuPadding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 4,
       ),
     );
   }

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/medication.dart';
-import '../../state/app_state.dart';
+import '../../core/services/cnes_service.dart';
+import '../../core/widgets/app_card_actions.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../state/app_state.dart';
 import 'NovoMedicamento.dart';
 
 class MedicationsPage extends StatelessWidget {
@@ -187,9 +189,21 @@ class _MedicationTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  PopupMenuButton<String>(
-                    tooltip: 'Mais ações',
-                    iconColor: colorScheme.primary,
+                  AppCardActions(
+                    actions: [
+                      AppMenuAction(
+                        label: 'Editar',
+                        icon: Icons.edit,
+                        value: 'edit',
+                      ),
+                      AppMenuAction(
+                        label: 'Excluir',
+                        icon: Icons.delete,
+                        value: 'delete',
+                        color: colorScheme.error,
+                        visible: m.dispensationId == null,
+                      ),
+                    ],
                     onSelected: (value) async {
                       if (value == 'edit') {
                         final result = await Navigator.of(context).push<String>(
@@ -198,7 +212,10 @@ class _MedicationTile extends StatelessWidget {
                           ),
                         );
                         if (result == 'updated' && context.mounted) {
-                          AppSnackBar.showSuccess(rootContext, 'Medicamento atualizado');
+                          AppSnackBar.showSuccess(
+                            rootContext,
+                            'Medicamento atualizado',
+                          );
                         }
                       } else if (value == 'delete' &&
                           m.dispensationId == null) {
@@ -225,50 +242,14 @@ class _MedicationTile extends StatelessWidget {
                           ),
                         );
                         if (confirmed == true && context.mounted) {
-                          final theme = Theme.of(rootContext);
-                          final messenger = ScaffoldMessenger.of(rootContext);
-                          AppSnackBar.showError(rootContext, 'Medicamento excluído');
+                          AppSnackBar.showError(
+                            rootContext,
+                            'Medicamento excluído',
+                          );
                           await context.read<AppState>().removeMedication(m.id);
                         }
                       }
                     },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.edit,
-                              size: 20,
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Editar',
-                              style: TextStyle(color: colorScheme.primary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (m.dispensationId == null)
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.delete,
-                                size: 20,
-                                color: colorScheme.error,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Excluir',
-                                style: TextStyle(color: colorScheme.error),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
                   ),
                 ],
               ),

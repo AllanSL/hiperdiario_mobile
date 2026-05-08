@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/appointment.dart';
 import '../../core/services/cnes_service.dart';
+import '../../core/widgets/app_card_actions.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../state/app_state.dart';
 import 'NovaConsulta.dart';
@@ -132,96 +133,36 @@ class _AppointmentCard extends StatelessWidget {
             // Cabeçalho: Data e Turno — layout responsivo com Wrap
             Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            color: isToday
-                                ? Colors.orange
-                                : colorScheme.primary,
-                            size: smallIconSize,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            dateFormat.format(appointment.dateTime),
-                            style: textTheme.titleMedium?.copyWith(
-                              color: isToday
-                                  ? Colors.orange
-                                  : colorScheme.onSurface,
-                            ),
-                          ),
-                          if (isToday) ...[
-                            const SizedBox(width: 8),
-                            _Badge(
-                              label: 'HOJE',
-                              color: Colors.orange,
-                              filled: true,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _Badge(
-                            label: 'TURNO: ${appointment.shift.label}',
-                            color: colorScheme.onSurfaceVariant,
-                            filled: true,
-                            stadium: true,
-                          ),
-                          const SizedBox(width: 8),
-                          _StatusBadge(appointment: appointment),
-                        ],
-                      ),
-                    ],
+                Icon(
+                  Icons.calendar_today,
+                  color: isToday ? Colors.orange : colorScheme.primary,
+                  size: smallIconSize,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  dateFormat.format(appointment.dateTime),
+                  style: textTheme.titleMedium?.copyWith(
+                    color: isToday ? Colors.orange : colorScheme.onSurface,
                   ),
                 ),
-                PopupMenuButton(
-                  iconColor: colorScheme.primary,
-                  itemBuilder: (context) => [
-                    if (canEdit)
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.edit,
-                              size: smallIconSize,
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Editar',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    PopupMenuItem(
+                if (isToday) ...[
+                  const SizedBox(width: 8),
+                  _Badge(label: 'HOJE', color: Colors.orange, filled: true),
+                ],
+                const Spacer(),
+                AppCardActions(
+                  actions: [
+                    AppMenuAction(
+                      label: 'Editar',
+                      icon: Icons.edit,
+                      value: 'edit',
+                      visible: canEdit,
+                    ),
+                    AppMenuAction(
+                      label: 'Excluir',
+                      icon: Icons.delete,
                       value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete,
-                            size: smallIconSize,
-                            color: colorScheme.error,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Excluir',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.error,
-                            ),
-                          ),
-                        ],
-                      ),
+                      color: colorScheme.error,
                     ),
                   ],
                   onSelected: (value) async {
@@ -234,7 +175,10 @@ class _AppointmentCard extends StatelessWidget {
                         ),
                       );
                       if (result == 'updated' && context.mounted) {
-                        AppSnackBar.showSuccess(rootContext, 'Consulta atualizada com sucesso');
+                        AppSnackBar.showSuccess(
+                          rootContext,
+                          'Consulta atualizada com sucesso',
+                        );
                       }
                     } else if (value == 'delete') {
                       _confirmDelete(context, rootContext);
@@ -242,6 +186,19 @@ class _AppointmentCard extends StatelessWidget {
                   },
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _Badge(
+                  label: 'TURNO: ${appointment.shift.label}',
+                  color: colorScheme.onSurfaceVariant,
+                  filled: true,
+                  stadium: true,
+                ),
+                const SizedBox(width: 8),
+                _StatusBadge(appointment: appointment),
+               ],
             ),
             const Divider(height: 24),
 
