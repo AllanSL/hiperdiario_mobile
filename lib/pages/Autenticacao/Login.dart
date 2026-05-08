@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/widgets/app_input_decoration.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../core/providers/accessibility_provider.dart';
 import '../../core/providers/theme_provider.dart';
+import '../../core/models/municipio.dart';
 import '../../core/services/ibge_service.dart';
 import '../../core/services/municipio_service.dart';
 import '../../core/services/via_cep_service.dart';
@@ -237,30 +239,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showErrorSnackBar(String message) {
-    final colorScheme = Theme.of(context).colorScheme;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: colorScheme.errorContainer,
-        duration: const Duration(seconds: 3),
-        content: Row(
-          children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colorScheme.onErrorContainer),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 
   Future<void> _submit() async {
@@ -692,30 +671,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _showErrorSnackBar(Object error) {
     final message = error is String ? error : _extractErrorMessage(error);
-    final colorScheme = Theme.of(context).colorScheme;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: colorScheme.errorContainer,
-        duration: const Duration(seconds: 3),
-        content: Row(
-          children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colorScheme.onErrorContainer),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 
   @override
@@ -2697,31 +2653,7 @@ class _RegisterPageState extends State<RegisterPage> {
         complement: _complementoController.text,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          backgroundColor: Colors.green.shade700,
-          duration: const Duration(seconds: 3),
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle_outline, color: Colors.white),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Cadastro realizado com sucesso!',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      AppSnackBar.showSuccess(context, 'Cadastro realizado com sucesso!');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;

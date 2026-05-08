@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../core/services/notification_service.dart';
+import '../../core/widgets/app_snackbar.dart';
 
 import '../../state/app_state.dart';
 import '../../core/providers/theme_provider.dart';
@@ -121,6 +122,7 @@ class _HomePageState extends State<HomePage> {
 
     final confirmedIds = await showDialog<List<String>>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setState) {
@@ -171,13 +173,15 @@ class _HomePageState extends State<HomePage> {
                   child: const Text('Sair'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    final selectedIds = meds
-                        .where((m) => selected[m.id] == true)
-                        .map((m) => m.id)
-                        .toList();
-                    Navigator.of(ctx).pop(selectedIds);
-                  },
+                  onPressed: selected.values.contains(true)
+                      ? () {
+                          final selectedIds = meds
+                              .where((m) => selected[m.id] == true)
+                              .map((m) => m.id)
+                              .toList();
+                          Navigator.of(ctx).pop(selectedIds);
+                        }
+                      : null,
                   child: const Text('Tomei'),
                 ),
               ],
@@ -368,40 +372,7 @@ class _HomePageState extends State<HomePage> {
               child: IconButton(
                 tooltip: 'Atualizar medicamentos da UBS',
                 onPressed: () async {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer,
-                      duration: const Duration(seconds: 2),
-                      content: Row(
-                        children: [
-                          Icon(
-                            Icons.sync,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onPrimaryContainer,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Buscando atualizações na UBS',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  AppSnackBar.showSuccess(context, 'Buscando atualizações na UBS');
                   await context.read<AppState>().syncUbsData();
                 },
                 icon: const Icon(Icons.sync),
@@ -413,40 +384,7 @@ class _HomePageState extends State<HomePage> {
               child: IconButton(
                 tooltip: 'Atualizar consultas',
                 onPressed: () async {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer,
-                      duration: const Duration(seconds: 2),
-                      content: Row(
-                        children: [
-                          Icon(
-                            Icons.sync,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onPrimaryContainer,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Buscando atualizações na UBS',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  AppSnackBar.showSuccess(context, 'Buscando atualizações na UBS');
                   await context.read<AppState>().syncUbsData();
                 },
                 icon: const Icon(Icons.sync),
@@ -516,36 +454,7 @@ class _HomePageState extends State<HomePage> {
                 onTap: () async {
                   await _logout(context);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        behavior: SnackBarBehavior.floating,
-                        margin: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                        duration: const Duration(seconds: 2),
-                        content: Row(
-                          children: [
-                            Icon(
-                              Icons.logout,
-                              color: Theme.of(context).colorScheme.onError,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Sessão encerrada',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onError,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                    AppSnackBar.show(context, 'Sessão encerrada', isError: true);
                   }
                 },
               ),
@@ -597,42 +506,7 @@ class _HomePageState extends State<HomePage> {
                     );
                     if (!mounted) return;
                     if (result == 'added') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          behavior: SnackBarBehavior.floating,
-                          margin: const EdgeInsets.all(16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          duration: const Duration(seconds: 2),
-                          content: Row(
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Medicamento adicionado com sucesso',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+                      AppSnackBar.showSuccess(context, 'Medicamento adicionado com sucesso');
                     }
                   },
                   icon: const Icon(Icons.add),
@@ -651,42 +525,7 @@ class _HomePageState extends State<HomePage> {
                 );
                 if (!mounted) return;
                 if (result == 'added') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer,
-                      duration: const Duration(seconds: 2),
-                      content: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onPrimaryContainer,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Consulta agendada com sucesso',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  AppSnackBar.showSuccess(context, 'Consulta agendada com sucesso');
                 }
               },
               icon: const Icon(Icons.add),

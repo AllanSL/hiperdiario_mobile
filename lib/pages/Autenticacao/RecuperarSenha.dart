@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/widgets/app_input_decoration.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../state/app_state.dart';
 
 class CpfInputFormatter extends TextInputFormatter {
@@ -126,39 +127,7 @@ class _RecoverPasswordPageState extends State<RecoverPasswordPage> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    if (!mounted) return;
-    final colorScheme = Theme.of(context).colorScheme;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: isError
-            ? colorScheme.errorContainer
-            : colorScheme.primaryContainer,
-        content: Row(
-          children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: isError
-                  ? colorScheme.onErrorContainer
-                  : colorScheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: isError
-                      ? colorScheme.onErrorContainer
-                      : colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    AppSnackBar.show(context, message, isError: isError);
   }
 
   Future<void> _checkPatient() async {

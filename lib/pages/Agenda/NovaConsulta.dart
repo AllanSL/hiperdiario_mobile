@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/models/appointment.dart';
 import '../../core/services/cnes_service.dart';
 import '../../core/widgets/app_input_decoration.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../state/app_state.dart';
 
 class AddAppointmentPage extends StatefulWidget {
@@ -724,29 +725,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   }
 
   void _showToast(String message) {
-    if (!mounted) return;
-    final theme = Theme.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: theme.colorScheme.error,
-        duration: const Duration(seconds: 2),
-        content: Row(
-          children: [
-            Icon(Icons.error_outline, color: theme.colorScheme.onError),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: theme.colorScheme.onError),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    AppSnackBar.showError(context, message);
   }
 
   Future<void> _save() async {

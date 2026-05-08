@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/medication.dart';
 import '../../state/app_state.dart';
+import '../../core/widgets/app_snackbar.dart';
 import 'NovoMedicamento.dart';
 
 class MedicationsPage extends StatelessWidget {
@@ -197,42 +198,7 @@ class _MedicationTile extends StatelessWidget {
                           ),
                         );
                         if (result == 'updated' && context.mounted) {
-                          ScaffoldMessenger.of(rootContext).showSnackBar(
-                            SnackBar(
-                              behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.all(16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primaryContainer,
-                              duration: const Duration(seconds: 2),
-                              content: Row(
-                                children: [
-                                  Icon(
-                                    Icons.check_circle_outline,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimaryContainer,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Medicamento atualizado',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                          AppSnackBar.showSuccess(rootContext, 'Medicamento atualizado');
                         }
                       } else if (value == 'delete' &&
                           m.dispensationId == null) {
@@ -261,36 +227,7 @@ class _MedicationTile extends StatelessWidget {
                         if (confirmed == true && context.mounted) {
                           final theme = Theme.of(rootContext);
                           final messenger = ScaffoldMessenger.of(rootContext);
-                          messenger.showSnackBar(
-                            SnackBar(
-                              behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.all(16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: theme.colorScheme.error,
-                              duration: const Duration(seconds: 2),
-                              content: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete_outline,
-                                    color: theme.colorScheme.onError,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Medicamento excluído',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: theme.colorScheme.onError,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                          AppSnackBar.showError(rootContext, 'Medicamento excluído');
                           await context.read<AppState>().removeMedication(m.id);
                         }
                       }
@@ -596,11 +533,7 @@ class _AcknowledgeDispensationSheetState
   void _save() async {
     final d = widget.dispensation;
     if (_times.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Defina o primeiro horário para ativar os alarmes'),
-        ),
-      );
+      AppSnackBar.showError(context, 'Defina o primeiro horário para ativar os alarmes');
       return;
     }
 
@@ -618,41 +551,12 @@ class _AcknowledgeDispensationSheetState
       if (mounted) {
         Navigator.of(context).pop();
         final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            backgroundColor: theme.colorScheme.primaryContainer,
-            duration: const Duration(seconds: 2),
-            content: Row(
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Medicamento da UBS sincronizado e alarmes ativados!',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Medicamento da UBS sincronizado e alarmes ativados!');
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+        AppSnackBar.showError(context, 'Erro: $e');
       }
     }
   }

@@ -6,10 +6,12 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/models/emergency_contact.dart';
+import '../../core/models/municipio.dart';
 import '../../core/services/cnes_service.dart';
 import '../../core/services/ibge_service.dart';
 import '../../core/services/municipio_service.dart';
 import '../../core/widgets/app_input_decoration.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../state/app_state.dart';
 
 /// Formatter para telefone brasileiro: (00) 00000-0000 ou (00) 0000-0000
@@ -863,34 +865,7 @@ class _EditLocationPageState extends State<EditLocationPage> {
 
     if (!mounted) return;
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        duration: const Duration(seconds: 2),
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Localização atualizada: ${_municipioSelecionado!.nome} / ${_estadoSelecionado!.sigla}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    AppSnackBar.showSuccess(context, 'Localização atualizada: ${_municipioSelecionado!.nome} / ${_estadoSelecionado!.sigla}');
   }
 
   Future<bool> _onWillPop() async {
@@ -1965,34 +1940,7 @@ class _EditPersonalContactsPageState extends State<EditPersonalContactsPage> {
 
     if (!mounted) return;
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        duration: const Duration(seconds: 2),
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Contatos atualizados com sucesso',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    AppSnackBar.showSuccess(context, 'Contatos atualizados com sucesso');
   }
 }
 
@@ -2476,34 +2424,7 @@ class _EditEmergencyContactPageState extends State<EditEmergencyContactPage> {
 
     if (!mounted) return;
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        duration: const Duration(seconds: 2),
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Contato de emergência atualizado',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    AppSnackBar.showSuccess(context, 'Contato de emergência atualizado');
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/appointment.dart';
 import '../../core/services/cnes_service.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../state/app_state.dart';
 import 'NovaConsulta.dart';
 
@@ -233,42 +234,7 @@ class _AppointmentCard extends StatelessWidget {
                         ),
                       );
                       if (result == 'updated' && context.mounted) {
-                        ScaffoldMessenger.of(rootContext).showSnackBar(
-                          SnackBar(
-                            behavior: SnackBarBehavior.floating,
-                            margin: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            backgroundColor: Theme.of(
-                              rootContext,
-                            ).colorScheme.primaryContainer,
-                            duration: const Duration(seconds: 2),
-                            content: Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle_outline,
-                                  color: Theme.of(
-                                    rootContext,
-                                  ).colorScheme.onPrimaryContainer,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Consulta atualizada com sucesso',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        rootContext,
-                                      ).colorScheme.onPrimaryContainer,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                        AppSnackBar.showSuccess(rootContext, 'Consulta atualizada com sucesso');
                       }
                     } else if (value == 'delete') {
                       _confirmDelete(context, rootContext);
@@ -384,34 +350,7 @@ class _AppointmentCard extends StatelessWidget {
             onPressed: () {
               context.read<AppState>().removeAppointment(appointment.id);
               Navigator.pop(context);
-              ScaffoldMessenger.of(rootContext).showSnackBar(
-                SnackBar(
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  backgroundColor: Theme.of(rootContext).colorScheme.error,
-                  duration: const Duration(seconds: 2),
-                  content: Row(
-                    children: [
-                      Icon(
-                        Icons.delete_outline,
-                        color: Theme.of(rootContext).colorScheme.onError,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Consulta excluída',
-                          style: TextStyle(
-                            color: Theme.of(rootContext).colorScheme.onError,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
+              AppSnackBar.showError(rootContext, 'Consulta excluída');
             },
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
@@ -517,7 +456,7 @@ class _Badge extends StatelessWidget {
       decoration: BoxDecoration(
         color: filled
             ? (stadium ? theme.colorScheme.surfaceContainerHighest : color)
-            : color.withValues(alpha: 0.1),
+            : color.withValues(alpha: 0.2),
         borderRadius: stadium
             ? BorderRadius.circular(100)
             : BorderRadius.circular(8 * f),

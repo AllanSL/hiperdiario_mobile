@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/accessibility_provider.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/widgets/app_snackbar.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -36,36 +37,7 @@ class _SettingsPageState extends State<SettingsPage> {
     // Recarrega o status após solicitar
     await _checkPermission();
     if (mounted && _hasExactAlarmPermission) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          duration: const Duration(seconds: 2),
-          content: Row(
-            children: [
-              Icon(
-                Icons.check_circle_outline,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Permissão de alarmes concedida',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      AppSnackBar.showSuccess(context, 'Permissão de alarmes concedida');
     }
   }
 

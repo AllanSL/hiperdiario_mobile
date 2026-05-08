@@ -7,6 +7,7 @@ import '../core/models/appointment.dart';
 import '../core/models/emergency_contact.dart';
 import '../core/models/medication.dart';
 import '../core/models/patient.dart';
+import '../core/models/municipio.dart';
 import '../core/services/ibge_service.dart';
 import '../core/services/municipio_service.dart';
 import '../core/services/cnes_service.dart';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/data/medication_repository.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/app_input_decoration.dart';
 
 class SupabaseMedicationsPage extends StatefulWidget {
@@ -91,9 +92,7 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
                 Navigator.of(ctx).pop(true);
               } catch (e) {
                 Navigator.of(ctx).pop(false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Erro: ${e.toString()}')),
-                );
+                AppSnackBar.showError(context, 'Erro: ${e.toString()}');
               }
             },
             child: const Text('Salvar'),
@@ -128,19 +127,13 @@ class _SupabaseMedicationsPageState extends State<SupabaseMedicationsPage> {
     try {
       final success = await repo.deleteMedication(id);
       if (success) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Removido')));
+        AppSnackBar.showSuccess(context, 'Removido');
         _load();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não foi possível remover')),
-        );
+        AppSnackBar.showError(context, 'Não foi possível remover');
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro: ${e.toString()}')));
+      AppSnackBar.showError(context, 'Erro: ${e.toString()}');
     }
   }
 
