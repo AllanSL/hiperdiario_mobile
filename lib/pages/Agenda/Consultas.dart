@@ -149,6 +149,14 @@ class _AppointmentCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   _Badge(label: 'HOJE', color: Colors.orange, filled: true),
                 ],
+                if (appointment.syncStatus == 'pending') ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.cloud_upload_outlined,
+                    size: smallIconSize,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+                ],
                 const Spacer(),
                 AppCardActions(
                   actions: [

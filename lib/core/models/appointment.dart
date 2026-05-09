@@ -37,6 +37,7 @@ class Appointment {
   final bool?
   attended; // null: não ocorreu ainda, true: compareceu, false: faltou
   final String? status;
+  final String syncStatus; // 'synced' or 'pending'
 
   Appointment({
     required this.id,
@@ -49,6 +50,7 @@ class Appointment {
     this.notes,
     this.attended,
     this.status,
+    this.syncStatus = 'synced',
   });
 
   Appointment copyWith({
@@ -62,6 +64,7 @@ class Appointment {
     String? notes,
     bool? attended,
     String? status,
+    String? syncStatus,
   }) {
     return Appointment(
       id: id ?? this.id,
@@ -74,6 +77,7 @@ class Appointment {
       notes: notes ?? this.notes,
       attended: attended ?? this.attended,
       status: status ?? this.status,
+      syncStatus: syncStatus ?? this.syncStatus,
     );
   }
 }

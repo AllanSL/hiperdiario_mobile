@@ -3,9 +3,10 @@ class Medication {
   final String name;
   final String dosage; // ex: 500mg 1x ao dia
   final List<TimeOfDayLite> times; // horários do dia
-  int stockUnits; // unidades em casa
+  final int stockUnits; // unidades em casa
   final String?
   dispensationId; // Identificador da UBS, se nulo = criado pelo paciente.
+  final String syncStatus; // 'synced' or 'pending'
 
   Medication({
     required this.id,
@@ -14,7 +15,28 @@ class Medication {
     required this.times,
     required this.stockUnits,
     this.dispensationId,
+    this.syncStatus = 'synced',
   });
+
+  Medication copyWith({
+    String? id,
+    String? name,
+    String? dosage,
+    List<TimeOfDayLite>? times,
+    int? stockUnits,
+    String? dispensationId,
+    String? syncStatus,
+  }) {
+    return Medication(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      dosage: dosage ?? this.dosage,
+      times: times ?? this.times,
+      stockUnits: stockUnits ?? this.stockUnits,
+      dispensationId: dispensationId ?? this.dispensationId,
+      syncStatus: syncStatus ?? this.syncStatus,
+    );
+  }
 }
 
 class TimeOfDayLite {

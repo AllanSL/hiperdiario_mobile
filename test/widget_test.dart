@@ -15,10 +15,16 @@ import 'package:hiperdiario/app_paciente.dart';
 import 'package:hiperdiario/pages/Autenticacao/Login.dart';
 import 'package:hiperdiario/state/app_state.dart';
 
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
+    // Initialize sqflite for tests
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    
     SharedPreferences.setMockInitialValues({});
     await Supabase.initialize(
       url: 'https://example.supabase.co',

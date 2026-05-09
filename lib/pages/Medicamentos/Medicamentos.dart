@@ -186,6 +186,14 @@ class _MedicationTile extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if (m.syncStatus == 'pending') ...[
+                          const SizedBox(width: 0),
+                          Icon(
+                            Icons.cloud_upload_outlined,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                          ),
+                        ],
                       ],
                     ),
                   ),

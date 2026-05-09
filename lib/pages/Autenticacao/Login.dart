@@ -1206,6 +1206,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _onUbsFocusChanged() {
     if (_ubsFocusNode.hasFocus) {
+      setState(() => _ubsModoDigitacao = false);
       if (!_ubsDropdownAberto) {
         setState(() => _ubsDropdownAberto = true);
         _ubsOverlayController.show();

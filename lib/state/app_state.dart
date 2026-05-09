@@ -11,6 +11,9 @@ import '../core/models/municipio.dart';
 import '../core/services/ibge_service.dart';
 import '../core/services/municipio_service.dart';
 import '../core/services/cnes_service.dart';
+import '../core/services/local_database.dart';
+import '../core/services/sync_service.dart';
+import 'package:uuid/uuid.dart';
 
 class AppState extends ChangeNotifier {
   bool _isLogged = false;
@@ -31,11 +34,17 @@ class AppState extends ChangeNotifier {
   int get lowStockDaysThreshold => _lowStockDaysThreshold;
 
   final SupabaseClient _supabase = Supabase.instance.client;
+  final _localDb = LocalDatabase.instance;
+  final _syncService = SyncService.instance;
+  final _uuid = const Uuid();
   Timer? _syncTimer;
 
   AppState() {
+    _syncService.init();
     // Check initial session
     _isLogged = _supabase.auth.currentSession != null;
+    _loadInitialLocalData();
+    
     if (_isLogged) {
       _loadDataAndSchedule();
       _startSyncTimer();
@@ -62,6 +71,12 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       }
     });
+  }
+
+  Future<void> _loadInitialLocalData() async {
+    _appointments = await _localDb.getAllAppointments();
+    _medications = await _localDb.getAllMedications();
+    notifyListeners();
   }
 
   void _startSyncTimer() {
@@ -469,6 +484,11 @@ class AppState extends ChangeNotifier {
       _appointments = (appointmentRows as List)
           .map((row) => _mapAppointmentFromDb(row as Map<String, dynamic>))
           .toList();
+      
+      // Save to local cache
+      for (final appt in _appointments) {
+        await _localDb.saveAppointment(appt);
+      }
     } else {
       _appointments = [];
     }
@@ -578,9 +598,14 @@ class AppState extends ChangeNotifier {
         .eq('owner_id', user.id)
         .eq('active', true)
         .order('created_at', ascending: false);
-    _medications = (medicationRows as List)
-        .map((row) => _mapMedicationFromDb(row as Map<String, dynamic>))
-        .toList();
+      _medications = (medicationRows as List)
+          .map((row) => _mapMedicationFromDb(row as Map<String, dynamic>))
+          .toList();
+      
+      // Save to local cache
+      for (final med in _medications) {
+        await _localDb.saveMedication(med);
+      }
 
     if (profileId != null) {
       try {
@@ -822,6 +847,7 @@ class AppState extends ChangeNotifier {
       notes: row['notes']?.toString(),
       attended: attended,
       status: status,
+      syncStatus: 'synced',
     );
   }
 
@@ -962,12 +988,22 @@ class AppState extends ChangeNotifier {
       times: times,
       stockUnits: stock,
       dispensationId: row['dispensation_id']?.toString(),
+      syncStatus: 'synced',
     );
   }
 
   // === Gerenciamento de Consultas ===
 
   Future<void> addAppointment(Appointment appt) async {
+    // Generate local ID if not present
+    final apptId = appt.id.isEmpty ? _uuid.v4() : appt.id;
+    final finalAppt = appt.id.isEmpty ? appt.copyWith(id: apptId) : appt;
+
+    // 1. Update memory and Local DB immediately
+    _appointments = [..._appointments, finalAppt];
+    notifyListeners();
+    await _localDb.saveAppointment(finalAppt, syncStatus: 'pending');
+
     final user = _supabase.auth.currentUser;
     if (user != null && _patient != null) {
       try {
@@ -980,38 +1016,47 @@ class AppState extends ChangeNotifier {
         final estab = await _supabase
             .from('cnes_establishments')
             .select('id')
-            .eq('cnes_id', appt.location)
+            .eq('cnes_id', finalAppt.location)
             .maybeSingle();
 
         if (profile != null) {
           final doc = {
             'patient_id': profile['id'],
-            'date_time': appt.dateTime.toUtc().toIso8601String(),
+            'remote_id': apptId, // Store local ID as remote_id for sync
+            'date_time': finalAppt.dateTime.toUtc().toIso8601String(),
             'establishment_id': estab?['id'],
-            'cnes_id': appt.location,
-            'specialty': appt.professionalId != null ? null : appt.specialty,
-            'professional_cns': appt.professionalId,
-            'shift': appt.shift.dbValue,
-            'notes': appt.notes,
-            'status': appt.attended == true
+            'cnes_id': finalAppt.location,
+            'specialty': finalAppt.professionalId != null ? null : finalAppt.specialty,
+            'professional_cns': finalAppt.professionalId,
+            'shift': finalAppt.shift.dbValue,
+            'notes': finalAppt.notes,
+            'status': finalAppt.attended == true
                 ? 'attended'
-                : appt.attended == false
+                : finalAppt.attended == false
                 ? 'missed'
                 : 'scheduled',
           };
-          await _supabase.from('appointments').insert(doc);
-        } else {
-          debugPrint(
-            'Falha: usurio no encontrado na tabela para associar a consulta.',
-          );
+          
+          // Try to insert, but also queue for sync if it fails
+          try {
+            await _supabase.from('appointments').insert(doc);
+            await _localDb.saveAppointment(finalAppt, syncStatus: 'synced');
+            // Update memory state
+            _appointments = _appointments.map((a) => a.id == apptId ? a.copyWith(syncStatus: 'synced') : a).toList();
+            notifyListeners();
+          } catch (e) {
+            await _localDb.addToSyncQueue(
+              tableName: 'appointments',
+              operation: 'INSERT',
+              data: doc,
+              localId: apptId,
+            );
+          }
         }
       } catch (e) {
-        debugPrint('Erro ao salvar agendamento no Supabase: $e');
+        debugPrint('Erro ao processar agendamento: $e');
       }
     }
-
-    _appointments = [..._appointments, appt];
-    notifyListeners();
     try {
       await NotificationService.instance.scheduleAppointmentReminders(appt);
     } catch (e) {
@@ -1020,14 +1065,19 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> updateAppointment(Appointment appt) async {
+    // 1. Update memory and Local DB
+    _appointments = _appointments
+        .map((e) => e.id == appt.id ? appt : e)
+        .toList();
+    notifyListeners();
+    await _localDb.saveAppointment(appt, syncStatus: 'pending');
+
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
-        // Tenta atualizar usando primeiramente o remote_id se existir, caso no, por safety pode tentar id numrico se for DB id.
         final targetId = appt.id;
         final isNumeric =
             int.tryParse(targetId) != null && targetId.length < 13;
-        // Heurstica p/ identificar id sequencial gerado pelo Supabase versus timestamp/UUID
 
         final estab = await _supabase
             .from('cnes_establishments')
@@ -1050,23 +1100,31 @@ class AppState extends ChangeNotifier {
               : 'scheduled',
         };
 
-        if (isNumeric) {
-          await _supabase.from('appointments').update(doc).eq('id', targetId);
-        } else {
-          await _supabase
-              .from('appointments')
-              .update(doc)
-              .eq('remote_id', targetId);
+        try {
+          if (isNumeric) {
+            await _supabase.from('appointments').update(doc).eq('id', targetId);
+          } else {
+            await _supabase
+                .from('appointments')
+                .update(doc)
+                .eq('remote_id', targetId);
+          }
+          await _localDb.saveAppointment(appt, syncStatus: 'synced');
+          // Update memory state
+          _appointments = _appointments.map((a) => a.id == targetId ? a.copyWith(syncStatus: 'synced') : a).toList();
+          notifyListeners();
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'appointments',
+            operation: 'UPDATE',
+            data: doc,
+            localId: targetId,
+          );
         }
       } catch (e) {
-        debugPrint('Erro ao atualizar agendamento no Supabase: $e');
+        debugPrint('Erro ao atualizar agendamento: $e');
       }
     }
-
-    _appointments = _appointments
-        .map((e) => e.id == appt.id ? appt : e)
-        .toList();
-    notifyListeners();
     // Cancela e reagenda todas as notificaes
     try {
       await NotificationService.instance.cancelAll();
@@ -1082,22 +1140,33 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> removeAppointment(String id) async {
+    // 1. Update memory and Local DB
+    _appointments = _appointments.where((e) => e.id != id).toList();
+    notifyListeners();
+    await _localDb.deleteAppointment(id);
+
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
         final isNumeric = int.tryParse(id) != null && id.length < 13;
-        if (isNumeric) {
-          await _supabase.from('appointments').delete().eq('id', id);
-        } else {
-          await _supabase.from('appointments').delete().eq('remote_id', id);
+        try {
+          if (isNumeric) {
+            await _supabase.from('appointments').delete().eq('id', id);
+          } else {
+            await _supabase.from('appointments').delete().eq('remote_id', id);
+          }
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'appointments',
+            operation: 'DELETE',
+            data: {},
+            localId: id,
+          );
         }
       } catch (e) {
-        debugPrint('Erro ao remover agendamento no Supabase: $e');
+        debugPrint('Erro ao remover agendamento: $e');
       }
     }
-
-    _appointments = _appointments.where((e) => e.id != id).toList();
-    notifyListeners();
     // Cancela e reagenda notificações restantes
     try {
       await NotificationService.instance.cancelAll();
@@ -1113,29 +1182,46 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> markAppointmentAttendance(String id, bool attended) async {
+    // 1. Update memory and Local DB
+    _appointments = _appointments.map((appt) {
+      if (appt.id == id) {
+        final updated = appt.copyWith(attended: attended);
+        _localDb.saveAppointment(updated, syncStatus: 'pending');
+        return updated;
+      }
+      return appt;
+    }).toList();
+    notifyListeners();
+
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
         final isNumeric = int.tryParse(id) != null && id.length < 13;
         final doc = {'status': attended ? 'attended' : 'missed'};
 
-        if (isNumeric) {
-          await _supabase.from('appointments').update(doc).eq('id', id);
-        } else {
-          await _supabase.from('appointments').update(doc).eq('remote_id', id);
+        try {
+          if (isNumeric) {
+            await _supabase.from('appointments').update(doc).eq('id', id);
+          } else {
+            await _supabase.from('appointments').update(doc).eq('remote_id', id);
+          }
+          final updatedAppt = _appointments.firstWhere((a) => a.id == id);
+          await _localDb.saveAppointment(updatedAppt, syncStatus: 'synced');
+          // Update memory state
+          _appointments = _appointments.map((a) => a.id == id ? a.copyWith(syncStatus: 'synced') : a).toList();
+          notifyListeners();
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'appointments',
+            operation: 'UPDATE',
+            data: doc,
+            localId: id,
+          );
         }
       } catch (e) {
-        debugPrint('Erro ao atualizar presence no Supabase: $e');
+        debugPrint('Erro ao atualizar presença: $e');
       }
     }
-
-    _appointments = _appointments.map((appt) {
-      if (appt.id == id) {
-        return appt.copyWith(attended: attended);
-      }
-      return appt;
-    }).toList();
-    notifyListeners();
   }
 
   // === Gerenciamento de Contatos ===
@@ -1240,31 +1326,58 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> addMedication(Medication m) async {
+    // Generate local ID if not present
+    final medId = m.id.isEmpty ? _uuid.v4() : m.id;
+    final finalMed = m.id.isEmpty ? Medication(
+      id: medId,
+      name: m.name,
+      dosage: m.dosage,
+      times: m.times,
+      stockUnits: m.stockUnits,
+      dispensationId: m.dispensationId,
+    ) : m;
+
+    // 1. Update memory and Local DB immediately
+    _medications = [..._medications, finalMed];
+    notifyListeners();
+    await _localDb.saveMedication(finalMed, syncStatus: 'pending');
+
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
         final doc = {
-          'remote_id': m.id,
+          'remote_id': medId,
           'owner_id': user.id,
-          'name': m.name,
-          'dosage_instructions': m.dosage,
-          'frequency': m.times
+          'name': finalMed.name,
+          'dosage_instructions': finalMed.dosage,
+          'frequency': finalMed.times
               .map(
                 (t) =>
                     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
               )
               .toList(),
-          'stock': m.stockUnits,
+          'stock': finalMed.stockUnits,
           'active': true,
         };
-        await _supabase.from('medications').insert(doc);
+
+        try {
+          await _supabase.from('medications').insert(doc);
+          await _localDb.saveMedication(finalMed, syncStatus: 'synced');
+          // Update memory state
+          _medications = _medications.map((m) => m.id == medId ? m.copyWith(syncStatus: 'synced') : m).toList();
+          notifyListeners();
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'medications',
+            operation: 'INSERT',
+            data: doc,
+            localId: medId,
+          );
+        }
       } catch (e) {
-        debugPrint('Erro ao salvar medicamento no Supabase: $e');
+        debugPrint('Erro ao salvar medicamento: $e');
       }
     }
-
-    _medications = [..._medications, m];
-    notifyListeners();
     try {
       await NotificationService.instance.cancelAll();
       await NotificationService.instance.scheduleAllMedicationReminders(
@@ -1334,6 +1447,11 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> updateMedication(Medication m) async {
+    // 1. Update memory and Local DB
+    _medications = _medications.map((e) => e.id == m.id ? m : e).toList();
+    notifyListeners();
+    await _localDb.saveMedication(m, syncStatus: 'pending');
+
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
@@ -1353,26 +1471,36 @@ class AppState extends ChangeNotifier {
           'stock': m.stockUnits,
         };
 
-        if (isNumeric) {
-          await _supabase
-              .from('medications')
-              .update(doc)
-              .eq('id', targetId)
-              .eq('owner_id', user.id);
-        } else {
-          await _supabase
-              .from('medications')
-              .update(doc)
-              .eq('remote_id', targetId)
-              .eq('owner_id', user.id);
+        try {
+          if (isNumeric) {
+            await _supabase
+                .from('medications')
+                .update(doc)
+                .eq('id', targetId)
+                .eq('owner_id', user.id);
+          } else {
+            await _supabase
+                .from('medications')
+                .update(doc)
+                .eq('remote_id', targetId)
+                .eq('owner_id', user.id);
+          }
+          await _localDb.saveMedication(m, syncStatus: 'synced');
+          // Update memory state
+          _medications = _medications.map((med) => med.id == targetId ? med.copyWith(syncStatus: 'synced') : med).toList();
+          notifyListeners();
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'medications',
+            operation: 'UPDATE',
+            data: doc,
+            localId: targetId,
+          );
         }
       } catch (e) {
-        debugPrint('Erro ao atualizar medicamento no Supabase: $e');
+        debugPrint('Erro ao atualizar medicamento: $e');
       }
     }
-
-    _medications = _medications.map((e) => e.id == m.id ? m : e).toList();
-    notifyListeners();
     // Para simplificar, cancela e reagenda todos os lembretes de medicação
     try {
       await NotificationService.instance.cancelAll();
@@ -1405,6 +1533,7 @@ class AppState extends ChangeNotifier {
         .map((e) => e.id == medId ? updatedMed : e)
         .toList();
     notifyListeners();
+    await _localDb.saveMedication(updatedMed, syncStatus: 'pending');
 
     final user = _supabase.auth.currentUser;
     if (user != null) {
@@ -1413,18 +1542,28 @@ class AppState extends ChangeNotifier {
         final isNumeric =
             int.tryParse(targetId) != null && targetId.length < 13;
         final doc = {'stock': newStock};
-        if (isNumeric) {
-          await _supabase
-              .from('medications')
-              .update(doc)
-              .eq('id', targetId)
-              .eq('owner_id', user.id);
-        } else {
-          await _supabase
-              .from('medications')
-              .update(doc)
-              .eq('remote_id', targetId)
-              .eq('owner_id', user.id);
+        try {
+          if (isNumeric) {
+            await _supabase
+                .from('medications')
+                .update(doc)
+                .eq('id', targetId)
+                .eq('owner_id', user.id);
+          } else {
+            await _supabase
+                .from('medications')
+                .update(doc)
+                .eq('remote_id', targetId)
+                .eq('owner_id', user.id);
+          }
+          await _localDb.saveMedication(updatedMed, syncStatus: 'synced');
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'medications',
+            operation: 'UPDATE',
+            data: doc,
+            localId: targetId,
+          );
         }
       } catch (e) {
         debugPrint('Erro ao sincronizar estoque (decrement): $e');
@@ -1462,6 +1601,7 @@ class AppState extends ChangeNotifier {
         .map((e) => e.id == medId ? updatedMed : e)
         .toList();
     notifyListeners();
+    await _localDb.saveMedication(updatedMed, syncStatus: 'pending');
 
     final user = _supabase.auth.currentUser;
     if (user != null) {
@@ -1470,18 +1610,28 @@ class AppState extends ChangeNotifier {
         final isNumeric =
             int.tryParse(targetId) != null && targetId.length < 13;
         final doc = {'stock': newStock};
-        if (isNumeric) {
-          await _supabase
-              .from('medications')
-              .update(doc)
-              .eq('id', targetId)
-              .eq('owner_id', user.id);
-        } else {
-          await _supabase
-              .from('medications')
-              .update(doc)
-              .eq('remote_id', targetId)
-              .eq('owner_id', user.id);
+        try {
+          if (isNumeric) {
+            await _supabase
+                .from('medications')
+                .update(doc)
+                .eq('id', targetId)
+                .eq('owner_id', user.id);
+          } else {
+            await _supabase
+                .from('medications')
+                .update(doc)
+                .eq('remote_id', targetId)
+                .eq('owner_id', user.id);
+          }
+          await _localDb.saveMedication(updatedMed, syncStatus: 'synced');
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'medications',
+            operation: 'UPDATE',
+            data: doc,
+            localId: targetId,
+          );
         }
       } catch (e) {
         debugPrint('Erro ao sincronizar estoque (increment): $e');
@@ -1499,30 +1649,41 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> removeMedication(String id) async {
+    // 1. Update memory and Local DB
+    _medications = _medications.where((e) => e.id != id).toList();
+    notifyListeners();
+    await _localDb.deleteMedication(id);
+
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
         final isNumeric = int.tryParse(id) != null && id.length < 13;
-        if (isNumeric) {
-          await _supabase
-              .from('medications')
-              .delete()
-              .eq('id', id)
-              .eq('owner_id', user.id);
-        } else {
-          await _supabase
-              .from('medications')
-              .delete()
-              .eq('remote_id', id)
-              .eq('owner_id', user.id);
+        try {
+          if (isNumeric) {
+            await _supabase
+                .from('medications')
+                .delete()
+                .eq('id', id)
+                .eq('owner_id', user.id);
+          } else {
+            await _supabase
+                .from('medications')
+                .delete()
+                .eq('remote_id', id)
+                .eq('owner_id', user.id);
+          }
+        } catch (e) {
+          await _localDb.addToSyncQueue(
+            tableName: 'medications',
+            operation: 'DELETE',
+            data: {},
+            localId: id,
+          );
         }
       } catch (e) {
-        debugPrint('Erro ao remover medicamento no Supabase: $e');
+        debugPrint('Erro ao remover medicamento: $e');
       }
     }
-
-    _medications = _medications.where((e) => e.id != id).toList();
-    notifyListeners();
     // Cancela e reagenda lembretes restantes
     try {
       await NotificationService.instance.cancelAll();
