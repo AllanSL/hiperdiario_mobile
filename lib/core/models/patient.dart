@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'emergency_contact.dart';
 
 class Patient {
@@ -98,6 +99,50 @@ class Patient {
       nomeMunicipio: clearLocalizacao
           ? null
           : (nomeMunicipio ?? this.nomeMunicipio),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'cpf': cpf,
+      'birth_date': birthDate.toIso8601String(),
+      'diseases': diseases.join(','),
+      'phone': contact,
+      'email': email,
+      'state_code': siglaUf,
+      'city_ibge': codigoMunicipio?.toString(),
+      'ubs_cnes': ubs,
+      'ubs_name': ubsName,
+      'zip_code': zipCode,
+      'street': street,
+      'number': number,
+      'neighborhood': neighborhood,
+      'complement': complement,
+      'emergency_contact': emergencyContact != null ? jsonEncode(emergencyContact!.toJson()) : null,
+    };
+  }
+
+  factory Patient.fromMap(Map<String, dynamic> map) {
+    return Patient(
+      name: map['name'] as String,
+      cpf: map['cpf'] as String,
+      birthDate: DateTime.parse(map['birth_date'] as String),
+      diseases: (map['diseases'] as String?)?.split(',').where((s) => s.isNotEmpty).toList() ?? [],
+      contact: map['phone'] as String? ?? '',
+      email: map['email'] as String?,
+      siglaUf: map['state_code'] as String?,
+      codigoMunicipio: int.tryParse(map['city_ibge']?.toString() ?? ''),
+      ubs: map['ubs_cnes'] as String? ?? '',
+      ubsName: map['ubs_name'] as String?,
+      zipCode: map['zip_code'] as String?,
+      street: map['street'] as String?,
+      number: map['number'] as String?,
+      neighborhood: map['neighborhood'] as String?,
+      complement: map['complement'] as String?,
+      emergencyContact: map['emergency_contact'] != null
+          ? EmergencyContact.fromJson(jsonDecode(map['emergency_contact'] as String) as Map<String, dynamic>)
+          : null,
     );
   }
 }

@@ -42,6 +42,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
   List<CnesEstabelecimento> _todosEstabelecimentos = [];
   List<CnesEstabelecimento> _sugestoesFiltradas = [];
   bool _cnesCarregando = true;
+  bool _cnesErro = false;
   bool _dropdownAberto = false;
   bool _locationModoDigitacao =
       false; // false = readOnly (sem teclado), true = editável
@@ -140,7 +141,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       codigoMunicipio: codigoMunicipio,
       // Filtra apenas UBS (codigo_tipo_unidade = 2)
       tipoUnidade: 2,
-    );
+    ).timeout(const Duration(seconds: 10), onTimeout: () => []);
     debugPrint(
       '[AddAppointment] Estabelecimentos carregados: ${resultado.length}',
     );
@@ -186,6 +187,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         _todosEstabelecimentos = resultado;
         _sugestoesFiltradas = resultado;
         _cnesCarregando = false;
+        _cnesErro = resultado.isEmpty;
       });
     }
   }
@@ -697,7 +699,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
       setState(() {
         _isDateLoading = false;
         _dateAvailabilityCalculated = true;
-        _dateAvailabilityLabel = 'Erro ao verificar disponibilidade';
+        _dateAvailabilityLabel = 'Sem conexão para verificar vagas';
       });
     }
   }
@@ -709,6 +711,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     if (_isDateBlocked || _isDateFull || (_dailyCapacity ?? 0) == 0) {
       return false;
     }
+    if (context.read<AppState>().isOffline) return false;
     return true;
   }
 
@@ -829,6 +832,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                         child: _DropdownCnes(
                           sugestoes: _sugestoesFiltradas,
                           carregando: _cnesCarregando,
+                          erro: _cnesErro,
                           colorScheme: colorScheme,
                           onSelected: _selecionarEstabelecimento,
                           maxHeight: alturaDisponivel.clamp(
@@ -1315,6 +1319,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
 class _DropdownCnes extends StatelessWidget {
   final List<CnesEstabelecimento> sugestoes;
   final bool carregando;
+  final bool erro;
   final ColorScheme colorScheme;
   final ValueChanged<CnesEstabelecimento> onSelected;
   final double maxHeight;
@@ -1322,6 +1327,7 @@ class _DropdownCnes extends StatelessWidget {
   const _DropdownCnes({
     required this.sugestoes,
     required this.carregando,
+    this.erro = false,
     required this.colorScheme,
     required this.onSelected,
     required this.maxHeight,
@@ -1337,6 +1343,8 @@ class _DropdownCnes extends StatelessWidget {
         constraints: BoxConstraints(maxHeight: maxHeight),
         child: carregando
             ? _buildLoading(context)
+            : erro && sugestoes.isEmpty
+            ? _buildErro(context)
             : sugestoes.isEmpty
             ? _buildVazio(context)
             : _buildLista(context),
@@ -1379,7 +1387,27 @@ class _DropdownCnes extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Nenhuma UBS encontrada para este município.\nDigite livremente o nome do local.',
+              'Nenhuma UBS encontrada para este município.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErro(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Icon(Icons.wifi_off_rounded, color: colorScheme.error, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Não foi possível carregar os locais. Verifique sua conexão.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

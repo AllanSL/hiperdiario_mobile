@@ -319,6 +319,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final isOffline = appState.isOffline;
     final pages = const [ProfilePage(), MedicationsPage(), AppointmentsPage()];
     const appTitle = 'HiperDiário';
     return Scaffold(
@@ -361,7 +363,7 @@ class _HomePageState extends State<HomePage> {
                 icon: const Icon(Icons.notifications_active),
               ),
             ),
-          if (_canShowMedFab)
+          if (_canShowMedFab && !isOffline)
             Tooltip(
               message: 'Atualizar medicamentos da UBS',
               child: IconButton(
@@ -373,7 +375,7 @@ class _HomePageState extends State<HomePage> {
                 icon: const Icon(Icons.sync),
               ),
             ),
-          if (_canShowAppointmentFab)
+          if (_canShowAppointmentFab && !isOffline)
             Tooltip(
               message: 'Atualizar consultas',
               child: IconButton(
@@ -511,7 +513,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           Offstage(
-            offstage: !_canShowAppointmentFab,
+            offstage: !_canShowAppointmentFab || isOffline,
             child: FloatingActionButton.extended(
               heroTag: 'btnAddAppointment',
               onPressed: () async {

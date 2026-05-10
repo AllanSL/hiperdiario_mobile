@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../core/services/notification_service.dart';
 import '../core/models/appointment.dart';
@@ -33,6 +34,9 @@ class AppState extends ChangeNotifier {
       List.unmodifiable(_pendingDispensations);
   int get lowStockDaysThreshold => _lowStockDaysThreshold;
 
+  bool _isOffline = false;
+  bool get isOffline => _isOffline;
+
   final SupabaseClient _supabase = Supabase.instance.client;
   final _localDb = LocalDatabase.instance;
   final _syncService = SyncService.instance;
@@ -41,6 +45,7 @@ class AppState extends ChangeNotifier {
 
   AppState() {
     _syncService.init();
+    _initConnectivity();
     // Check initial session
     _isLogged = _supabase.auth.currentSession != null;
     _loadInitialLocalData();
@@ -76,6 +81,10 @@ class AppState extends ChangeNotifier {
   Future<void> _loadInitialLocalData() async {
     _appointments = await _localDb.getAllAppointments();
     _medications = await _localDb.getAllMedications();
+    final patientMap = await _localDb.getPatient();
+    if (patientMap != null) {
+      _patient = Patient.fromMap(patientMap);
+    }
     notifyListeners();
   }
 
@@ -89,6 +98,25 @@ class AppState extends ChangeNotifier {
   void _stopSyncTimer() {
     _syncTimer?.cancel();
     _syncTimer = null;
+  }
+
+  void _initConnectivity() {
+    Connectivity().onConnectivityChanged.listen((results) {
+      final isOffline = results.contains(ConnectivityResult.none);
+      if (_isOffline != isOffline) {
+        _isOffline = isOffline;
+        notifyListeners();
+      }
+    });
+
+    // Check initial state
+    Connectivity().checkConnectivity().then((results) {
+      final isOffline = results.contains(ConnectivityResult.none);
+      if (_isOffline != isOffline) {
+        _isOffline = isOffline;
+        notifyListeners();
+      }
+    });
   }
 
   @override
@@ -399,11 +427,19 @@ class AppState extends ChangeNotifier {
       return;
     }
 
-    Map<String, dynamic>? profile = await _supabase
-        .from('patients')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+    Map<String, dynamic>? profile;
+    try {
+      profile = await _supabase
+          .from('patients')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('Erro ao buscar perfil (possivelmente offline): $e');
+      // Se falhar e já tivermos o paciente carregado do cache, mantemos o que temos
+      if (_patient != null) return;
+    }
 
     if (profile == null) {
       final cpfFromEmail = _extractCpfFromEmail(user.email);
@@ -422,7 +458,9 @@ class AppState extends ChangeNotifier {
           .from('professionals')
           .select('user_id')
           .eq('user_id', user.id)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
+
       if (isProf != null) {
         debugPrint(
           'Profissional detectado no mobile sem perfil de paciente. Forçando logout.',
@@ -433,6 +471,9 @@ class AppState extends ChangeNotifier {
         );
       } else {
         debugPrint('Usuário logado sem perfil de paciente e sem ser profissional.');
+        // Se estivermos offline, podemos ter um perfil local mas o fetch falhou
+        if (_patient != null) return;
+        
         await logout();
         throw Exception(
           'Perfil de paciente não encontrado. Entre em contato com a recepção.',
@@ -495,6 +536,9 @@ class AppState extends ChangeNotifier {
       nomeMunicipio: nomeMunicipio,
       ubsName: ubsName,
     );
+
+    // Salva o perfil localmente para uso offline
+    await _localDb.savePatient(_patient!.toMap());
 
     final profileId = profile?['id'];
     if (profileId != null) {

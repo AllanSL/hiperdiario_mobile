@@ -22,8 +22,34 @@ class LocalDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE patients (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              cpf TEXT NOT NULL,
+              birth_date TEXT,
+              gender TEXT,
+              diseases TEXT,
+              phone TEXT,
+              email TEXT,
+              state_code TEXT,
+              city_ibge TEXT,
+              ubs_cnes TEXT,
+              ubs_name TEXT,
+              zip_code TEXT,
+              street TEXT,
+              number TEXT,
+              neighborhood TEXT,
+              complement TEXT,
+              emergency_contact TEXT
+            )
+          ''');
+        }
+      },
     );
   }
 
@@ -80,6 +106,30 @@ class LocalDatabase {
       CREATE TABLE app_metadata (
         key TEXT PRIMARY KEY,
         value TEXT
+      )
+    ''');
+
+    // Patients Table
+    await db.execute('''
+      CREATE TABLE patients (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        cpf TEXT NOT NULL,
+        birth_date TEXT,
+        gender TEXT,
+        diseases TEXT,
+        phone TEXT,
+        email TEXT,
+        state_code TEXT,
+        city_ibge TEXT,
+        ubs_cnes TEXT,
+        ubs_name TEXT,
+        zip_code TEXT,
+        street TEXT,
+        number TEXT,
+        neighborhood TEXT,
+        complement TEXT,
+        emergency_contact TEXT
       )
     ''');
   }
@@ -193,6 +243,27 @@ class LocalDatabase {
   Future<void> removeFromSyncQueue(int id) async {
     final db = await instance.database;
     await db.delete('sync_queue', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Patient Operations ---
+
+  Future<void> savePatient(Map<String, dynamic> patient) async {
+    final db = await instance.database;
+    await db.insert('patients', patient, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Map<String, dynamic>?> getPatient() async {
+    final db = await instance.database;
+    final result = await db.query('patients', limit: 1);
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  Future<void> clearAllData() async {
+    final db = await instance.database;
+    await db.delete('appointments');
+    await db.delete('medications');
+    await db.delete('patients');
+    await db.delete('sync_queue');
   }
 
   Future<void> close() async {

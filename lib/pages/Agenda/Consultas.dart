@@ -14,7 +14,9 @@ class AppointmentsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allAppointments = context.watch<AppState>().appointments;
+    final appState = context.watch<AppState>();
+    final allAppointments = appState.appointments;
+    final isOffline = appState.isOffline;
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
 
@@ -69,14 +71,45 @@ class AppointmentsPage extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: upcomingAppointments.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (_, index) {
-        final appt = upcomingAppointments[index];
-        return _AppointmentCard(appointment: appt, rootContext: context);
-      },
+    return Column(
+      children: [
+        if (isOffline)
+          Container(
+            width: double.infinity,
+            color: theme.colorScheme.errorContainer,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.wifi_off_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Modo offline: agendamento e edições desabilitados.',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.all(12),
+            itemCount: upcomingAppointments.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (_, index) {
+              final appt = upcomingAppointments[index];
+              return _AppointmentCard(appointment: appt, rootContext: context);
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -112,7 +145,9 @@ class _AppointmentCard extends StatelessWidget {
       appointment.dateTime.month,
       appointment.dateTime.day,
     );
-    final canEdit = appointmentDateOnly.isAfter(today);
+    final isOffline = context.read<AppState>().isOffline;
+    final canEdit = appointmentDateOnly.isAfter(today) && !isOffline;
+    final canDelete = !isOffline;
 
     return Card(
       elevation: 2,
@@ -171,6 +206,7 @@ class _AppointmentCard extends StatelessWidget {
                       icon: Icons.delete,
                       value: 'delete',
                       color: colorScheme.error,
+                      visible: canDelete,
                     ),
                   ],
                   onSelected: (value) async {
