@@ -134,10 +134,18 @@ class AppState extends ChangeNotifier {
     } on AuthException catch (e) {
       _isLogged = false;
       _patient = null;
+      // Trata erro de rede específico do Supabase Auth
+      if (e.message.contains('fetch') || e.message.contains('network') || e.toString().contains('AuthRetryableFetchException')) {
+        throw Exception('Sem conexão com a internet. Verifique sua rede e tente novamente.');
+      }
       rethrow;
     } catch (e) {
       _isLogged = false;
       _patient = null;
+      final errorStr = e.toString();
+      if (errorStr.contains('fetch') || errorStr.contains('network') || errorStr.contains('SocketException') || errorStr.contains('AuthRetryableFetchException')) {
+        throw Exception('Sem conexão com a internet. Verifique sua rede.');
+      }
       rethrow;
     } finally {
       _isAuthenticating = false;
@@ -224,6 +232,12 @@ class AppState extends ChangeNotifier {
       );
 
       await _loadDataAndSchedule();
+    } catch (e) {
+      final errorStr = e.toString();
+      if (errorStr.contains('fetch') || errorStr.contains('network') || errorStr.contains('SocketException') || errorStr.contains('AuthRetryableFetchException')) {
+        throw Exception('Sem conexão com a internet. Verifique sua rede e tente novamente.');
+      }
+      rethrow;
     } finally {
       _isAuthenticating = false;
       notifyListeners();
@@ -352,12 +366,20 @@ class AppState extends ChangeNotifier {
     if (!_isValidCpf(cleanCpf)) {
       throw Exception('CPF inválido. Verifique e tente novamente.');
     }
-    final existing = await _supabase
-        .from('patients')
-        .select('id')
-        .eq('cpf', cleanCpf)
-        .maybeSingle();
-    return existing != null;
+    try {
+      final existing = await _supabase
+          .from('patients')
+          .select('id')
+          .eq('cpf', cleanCpf)
+          .maybeSingle();
+      return existing != null;
+    } catch (e) {
+      final errorStr = e.toString();
+      if (errorStr.contains('fetch') || errorStr.contains('network') || errorStr.contains('SocketException')) {
+        throw Exception('Sem conexão com a internet. Não foi possível verificar o CPF.');
+      }
+      rethrow;
+    }
   }
 
   Future<void> logout() async {
