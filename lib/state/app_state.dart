@@ -81,6 +81,12 @@ class AppState extends ChangeNotifier {
   Future<void> _loadInitialLocalData() async {
     _appointments = await _localDb.getAllAppointments();
     _medications = await _localDb.getAllMedications();
+    
+    // Agenda notificações a partir dos dados locais (essencial para funcionamento offline)
+    if (_medications.isNotEmpty) {
+      NotificationService.instance.scheduleAllMedicationReminders(_medications);
+    }
+
     final patientMap = await _localDb.getPatient();
     if (patientMap != null) {
       _patient = Patient.fromMap(patientMap);
@@ -1567,14 +1573,13 @@ class AppState extends ChangeNotifier {
         debugPrint('Erro ao atualizar medicamento: $e');
       }
     }
-    // Para simplificar, cancela e reagenda todos os lembretes de medicação
+    
+    // Reagenda notificações após a alteração (funciona offline)
     try {
       await NotificationService.instance.cancelAll();
-      await NotificationService.instance.scheduleAllMedicationReminders(
-        _medications,
-      );
+      await NotificationService.instance.scheduleAllMedicationReminders(_medications);
     } catch (e) {
-      // Ignora erro de notificações - não deve impedir salvamento
+      debugPrint('Erro ao reagendar notificações: $e');
     }
   }
 
