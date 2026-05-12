@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/appointment.dart';
+import '../../core/services/cnes_service.dart';
 import '../../state/app_state.dart';
 
 int _shiftOrder(AppointmentShift shift) {
@@ -196,11 +197,13 @@ class _HistoryCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    appointment.location ==
+                    formatCnesDisplayName(
+                      appointment.location ==
                             context.read<AppState>().patient?.ubs
                         ? (context.read<AppState>().patient?.ubsName ??
                               appointment.location)
                         : appointment.location,
+                    ),
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                   ),
                 ),

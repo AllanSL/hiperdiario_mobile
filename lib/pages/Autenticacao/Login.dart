@@ -1231,9 +1231,10 @@ class _RegisterPageState extends State<RegisterPage> {
       _erroUbs = null;
       _ubsModoDigitacao = false;
     });
-    _ubsController.text = ubs.nomeFantasia;
+    final formatted = formatCnesDisplayName(ubs.nomeFantasia);
+    _ubsController.text = formatted;
     _ubsController.selection = TextSelection.collapsed(
-      offset: ubs.nomeFantasia.length,
+      offset: formatted.length,
     );
     _fecharDropdownUbs();
     _ubsFocusNode.unfocus();
@@ -3273,7 +3274,7 @@ class _DropdownUbs extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          est.nomeFantasia,
+                          formatCnesDisplayName(est.nomeFantasia),
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: colorScheme.onSurface,

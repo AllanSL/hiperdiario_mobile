@@ -512,7 +512,7 @@ class AppState extends ChangeNotifier {
         ubsCnes != null &&
         ubsCnes.trim().isNotEmpty) {
       try {
-        ubsName = await _resolveUbsNameFromLocalCnes(ubsCnes.trim());
+        ubsName = formatCnesDisplayName(await _resolveUbsNameFromLocalCnes(ubsCnes.trim()) ?? '');
       } catch (_) {
         // Se a consulta local falhar, tentamos buscar via CNES externo.
       }
@@ -530,7 +530,7 @@ class AppState extends ChangeNotifier {
               .where((u) => u.codigoCnes.toString() == ubsCnes)
               .firstOrNull;
           if (match != null) {
-            ubsName = match.nomeFantasia;
+            ubsName = formatCnesDisplayName(match.nomeFantasia);
           }
         } catch (_) {}
       }
@@ -850,7 +850,7 @@ class AppState extends ChangeNotifier {
       ubs: row?['ubs_cnes']?.toString().isNotEmpty == true
           ? row!['ubs_cnes'].toString()
           : 'UBS não informada',
-      ubsName: ubsName ?? row?['ubs_name']?.toString(),
+      ubsName: ubsName != null ? formatCnesDisplayName(ubsName) : (row?['ubs_name'] != null ? formatCnesDisplayName(row!['ubs_name'].toString()) : null),
       zipCode: row?['zip_code']?.toString(),
       street: row?['street']?.toString(),
       number: row?['number']?.toString(),
@@ -877,7 +877,7 @@ class AppState extends ChangeNotifier {
 
       if (result is Map<String, dynamic>) {
         final name = result['name']?.toString().trim();
-        return (name?.isNotEmpty == true) ? name : null;
+        return (name?.isNotEmpty == true) ? formatCnesDisplayName(name!) : null;
       }
     } catch (_) {
       // Ignora erro e permite fallback para a rota externa.
@@ -907,7 +907,7 @@ class AppState extends ChangeNotifier {
     return Appointment(
       id: (row['remote_id'] ?? row['id']).toString(),
       dateTime: dateTime,
-      location: (establishmentName ?? row['cnes_id'] ?? 'Local não informado').toString(),
+      location: formatCnesDisplayName((establishmentName ?? row['cnes_id'] ?? 'Local não informado').toString()),
       specialty: (professionalSpecialty ?? row['specialty'] ?? 'Consulta').toString(),
       professionalName: professionalName?.toString(),
       professionalId: row['professional_cns']?.toString(),

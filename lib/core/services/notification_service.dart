@@ -9,6 +9,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../models/appointment.dart';
 import '../models/medication.dart';
+import 'cnes_service.dart' as cnes_service;
 
 class NotificationService {
   NotificationService._();
@@ -237,7 +238,7 @@ class NotificationService {
         id: _randomId(),
         title: 'Lembrete de Consulta',
         body:
-            'Amanhã você tem consulta em ${appt.location} no turno da ${appt.shift.label.toLowerCase()}.',
+            'Amanhã você tem consulta em ${cnes_service.formatCnesDisplayName(appt.location)} no turno da ${appt.shift.label.toLowerCase()}.',
         when: oneDayBefore,
       );
     }
@@ -247,7 +248,7 @@ class NotificationService {
         id: _randomId(),
         title: 'Consulta Hoje',
         body:
-            'Hoje você tem consulta em ${appt.location} no turno da ${appt.shift.label.toLowerCase()}.',
+            'Hoje você tem consulta em ${cnes_service.formatCnesDisplayName(appt.location)} no turno da ${appt.shift.label.toLowerCase()}.',
         when: sameDay,
       );
     }

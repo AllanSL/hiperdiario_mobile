@@ -444,9 +444,10 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     _estabelecimenteSelecionado = est;
     _carregarEspecialidades(est);
 
-    _locationController.text = est.nomeFantasia;
+    final formatted = est.displayText;
+    _locationController.text = formatted;
     _locationController.selection = TextSelection.collapsed(
-      offset: est.nomeFantasia.length,
+      offset: formatted.length,
     );
     _fecharDropdown();
     FocusManager.instance.primaryFocus?.unfocus();
