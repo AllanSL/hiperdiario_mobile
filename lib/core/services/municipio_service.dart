@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:excel/excel.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -7,15 +6,15 @@ import 'package:http/http.dart' as http;
 import '../models/municipio.dart';
 
 /// Serviço unificado para consulta de municípios.
-/// Tenta buscar via API e utiliza o Excel local como fallback.
+/// Tenta buscar via API e utiliza o JSON local como fallback.
 class MunicipioService {
   static const _saudeApiUrl =
       'https://apidadosabertos.saude.gov.br/macrorregiao-e-regiao-de-saude/municipio';
 
-  static List<Municipio>? _excelCache;
+  static List<Municipio>? _jsonCache;
 
   /// Busca todos os municípios de um estado pela sigla da UF (ex: "TO").
-  /// Prioriza a API do Ministério da Saúde e usa o Excel local se falhar.
+  /// Prioriza a API do Ministério da Saúde e usa o JSON local se falhar.
   static Future<List<Municipio>> buscarMunicipios(String siglaUf) async {
     // 1. Tenta via API do Ministério da Saúde
     final apiMeds = await _buscarViaApiSaude(siglaUf);
@@ -24,9 +23,27 @@ class MunicipioService {
       return apiMeds;
     }
 
-    // 2. Se falhar, tenta via Excel local
-    debugPrint('[MunicipioService] API falhou, tentando fallback via Excel');
-    return await _buscarViaExcel(siglaUf);
+    // 2. Se falhar, tenta via JSON local
+    debugPrint('[MunicipioService] API falhou ou retornou vazia, tentando fallback via JSON');
+    return await _buscarViaJson(siglaUf);
+  }
+
+  /// Busca um município específico pelo ID do IBGE.
+  static Future<Municipio?> buscarMunicipioPorId(int idMunicipio) async {
+    try {
+      final todos = await _carregarTudoDoJson();
+      // Se o ID tiver 7 dígitos (padrão IBGE com dígito verificador), 
+      // tentamos encontrar pelo código de 6 dígitos que é o usado no JSON e em algumas APIs.
+      final id6 = idMunicipio > 999999 ? idMunicipio ~/ 10 : idMunicipio;
+      
+      return todos.cast<Municipio?>().firstWhere(
+            (m) => m?.codigoMunicipio == id6 || m?.codigoMunicipio == idMunicipio,
+            orElse: () => null,
+          );
+    } catch (e) {
+      debugPrint('[MunicipioService] Erro ao buscar município por ID: $e');
+      return null;
+    }
   }
 
   static Future<List<Municipio>> _buscarViaApiSaude(String siglaUf) async {
@@ -60,58 +77,38 @@ class MunicipioService {
     }
   }
 
-  static Future<List<Municipio>> _buscarViaExcel(String siglaUf) async {
+  static Future<List<Municipio>> _buscarViaJson(String siglaUf) async {
     try {
-      if (_excelCache == null) {
-        final data = await rootBundle.load('CIDADES COMPLETO.xlsx');
-        final bytes = data.buffer.asUint8List();
-        final excel = Excel.decodeBytes(bytes);
-
-        final sheet = excel.tables.values.firstOrNull;
-        if (sheet == null || sheet.rows.isEmpty) return [];
-
-        final headerMap = _mapearCabecalhos(sheet.rows.first);
-        final listaExcel = <Municipio>[];
-
-        for (var i = 1; i < sheet.rows.length; i++) {
-          final row = sheet.rows[i];
-          final nome = _lerTexto(row, headerMap['nome']);
-          if (nome.isEmpty) continue;
-
-          final sigla = _lerTexto(row, headerMap['sigla_uf']);
-          final codigoUf = _lerInteiro(row, headerMap['id_uf']);
-          final codigoMunicipio6 = _lerInteiro(row, headerMap['id_municipio_6']);
-          final codigoMunicipio7 = _lerInteiro(row, headerMap['id_municipio']);
-
-          if (sigla.isEmpty && codigoUf == null) continue;
-          
-          // Padroniza para 6 dígitos (formato usado nas APIs de saúde)
-          final codigoMunicipio =
-              codigoMunicipio6 ??
-              (codigoMunicipio7 != null ? (codigoMunicipio7 ~/ 10) : null);
-              
-          if (codigoMunicipio == null) continue;
-
-          listaExcel.add(
-            Municipio(
-              codigoUf: codigoUf ?? 0,
-              siglaUf: sigla,
-              codigoMunicipio: codigoMunicipio,
-              nome: nome,
-            ),
-          );
-        }
-        _excelCache = listaExcel;
-      }
-
+      final todos = await _carregarTudoDoJson();
       final upper = siglaUf.toUpperCase();
-      final filtrados = _excelCache!
+      final filtrados = todos
           .where((m) => m.siglaUf.toUpperCase() == upper)
           .toList();
 
       return _processarLista(filtrados);
     } catch (e) {
-      debugPrint('[MunicipioService] Erro ao ler Excel: $e');
+      debugPrint('[MunicipioService] Erro ao ler JSON: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Municipio>> _carregarTudoDoJson() async {
+    if (_jsonCache != null) return _jsonCache!;
+
+    try {
+      final data = await rootBundle.loadString('assets/data/municipios.json');
+      final List<dynamic> jsonList = jsonDecode(data);
+      _jsonCache = jsonList
+          .map((e) => Municipio(
+                codigoUf: e['codigo_uf'] ?? 0,
+                siglaUf: e['sigla_uf'] ?? '',
+                codigoMunicipio: e['codigo_municipio'] ?? 0,
+                nome: e['nome'] ?? '',
+              ))
+          .toList();
+      return _jsonCache!;
+    } catch (e) {
+      debugPrint('[MunicipioService] Erro ao carregar JSON de municípios: $e');
       return [];
     }
   }
@@ -127,47 +124,5 @@ class MunicipioService {
       vistos.add(m.codigoMunicipio);
       return true;
     }).toList();
-  }
-
-  static Map<String, int> _mapearCabecalhos(List<Data?> headerRow) {
-    final headers = <String, int>{};
-    for (var i = 0; i < headerRow.length; i++) {
-      final val = headerRow[i]?.value?.toString() ?? '';
-      if (val.isEmpty) continue;
-      headers[_normalizar(val)] = i;
-    }
-
-    int? pick(List<String> keys) {
-      for (final key in keys) {
-        if (headers.containsKey(key)) return headers[key];
-      }
-      return null;
-    }
-
-    return {
-      'nome': pick(['nome', 'municipio', 'cidade']) ?? -1,
-      'sigla_uf': pick(['sigla_uf', 'uf', 'estado']) ?? -1,
-      'id_uf': pick(['id_uf', 'codigo_uf', 'cod_uf', 'ibge_uf']) ?? -1,
-      'id_municipio_6': pick(['id_municipio_6', 'codigo_municipio_6', 'cod_municipio_6', 'ibge_municipio']) ?? -1,
-      'id_municipio': pick(['id_municipio', 'codigo_municipio', 'cod_municipio', 'ibge_municipio_7']) ?? -1,
-    };
-  }
-
-  static String _normalizar(String input) => input
-      .trim()
-      .toLowerCase()
-      .replaceAll(RegExp(r'\s+'), '_')
-      .replaceAll(RegExp(r'[^a-z0-9_]'), '');
-
-  static String _lerTexto(List<Data?> row, int? index) {
-    if (index == null || index < 0 || index >= row.length) return '';
-    return row[index]?.value?.toString().trim() ?? '';
-  }
-
-  static int? _lerInteiro(List<Data?> row, int? index) {
-    if (index == null || index < 0 || index >= row.length) return null;
-    final raw = row[index]?.value?.toString().trim() ?? '';
-    if (raw.isEmpty) return null;
-    return int.tryParse(raw.replaceAll(RegExp(r'\D'), ''));
   }
 }

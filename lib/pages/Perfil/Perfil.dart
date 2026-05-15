@@ -8,7 +8,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/models/emergency_contact.dart';
 import '../../core/models/municipio.dart';
 import '../../core/services/cnes_service.dart';
-import '../../core/services/ibge_service.dart';
 import '../../core/services/municipio_service.dart';
 import '../../core/widgets/app_input_decoration.dart';
 import '../../core/widgets/app_snackbar.dart';
@@ -804,13 +803,7 @@ class _EditLocationPageState extends State<EditLocationPage> {
       });
     }
 
-    final estadoSelecionado = estadosBrasileiros.firstWhere(
-      (e) => e.sigla.toUpperCase() == siglaUf.toUpperCase(),
-    );
-    final lista = await IbgeService.buscarMunicipiosPorEstado(
-      codigoUf: estadoSelecionado.codigoIbge,
-      siglaUf: estadoSelecionado.sigla,
-    );
+    final lista = await MunicipioService.buscarMunicipios(siglaUf);
 
     // Verifica se o widget ainda está montado E se a geração ainda é a mais recente
     if (!mounted || minhaGeracao != _requestGeneration) return;

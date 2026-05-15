@@ -9,7 +9,6 @@ import '../core/models/emergency_contact.dart';
 import '../core/models/medication.dart';
 import '../core/models/patient.dart';
 import '../core/models/municipio.dart';
-import '../core/services/ibge_service.dart';
 import '../core/services/municipio_service.dart';
 import '../core/services/cnes_service.dart';
 import '../core/services/local_database.dart';
@@ -492,17 +491,20 @@ class AppState extends ChangeNotifier {
     final codigoMunicipio = municipioRaw is int
         ? municipioRaw
         : int.tryParse('${municipioRaw ?? ''}');
-    final siglaUf = profile['state_code']?.toString();
-    final codigoUf = _resolveCodigoUf(siglaUf);
+    String? siglaUf = profile['state_code']?.toString();
+    int? codigoUf = _resolveCodigoUf(siglaUf);
 
-    if (codigoMunicipio != null && siglaUf != null && codigoUf != null) {
+    if (codigoMunicipio != null) {
       try {
-        final municipio = await IbgeService.buscarMunicipioPorId(
-          idMunicipio: codigoMunicipio,
-          siglaUf: siglaUf,
-          codigoUf: codigoUf,
-        );
-        nomeMunicipio = municipio?.nome;
+        final municipio = await MunicipioService.buscarMunicipioPorId(codigoMunicipio);
+        if (municipio != null) {
+          nomeMunicipio = municipio.nome;
+          // Se a sigla da UF estiver ausente no perfil, recuperamos do município resolvido
+          if (siglaUf == null || siglaUf.isEmpty) {
+            siglaUf = municipio.siglaUf;
+            codigoUf = municipio.codigoUf;
+          }
+        }
       } catch (_) {}
     }
 

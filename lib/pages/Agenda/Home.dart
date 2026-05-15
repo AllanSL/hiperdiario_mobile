@@ -448,12 +448,7 @@ class _HomePageState extends State<HomePage> {
               ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text('Sair'),
-                onTap: () async {
-                  await _logout(context);
-                  if (mounted) {
-                    AppSnackBar.show(context, 'Sessão encerrada', isError: true);
-                  }
-                },
+                onTap: () => _logout(context),
               ),
             ],
           ),

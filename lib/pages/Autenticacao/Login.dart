@@ -7,10 +7,10 @@ import '../../core/widgets/app_snackbar.dart';
 import '../../core/providers/accessibility_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/models/municipio.dart';
-import '../../core/services/ibge_service.dart';
 import '../../core/services/municipio_service.dart';
 import '../../core/services/via_cep_service.dart';
 import '../../core/services/cnes_service.dart';
+import '../Autenticacao/RecuperarSenha.dart';
 import '../../state/app_state.dart';
 
 class CpfInputFormatter extends TextInputFormatter {
@@ -422,7 +422,22 @@ class _LoginPageState extends State<LoginPage> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 24),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => const RecoverPasswordPage(),
+                                          ),
+                                        );
+                                      },
+                                child: const Text('Esqueci minha senha'),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
                             SizedBox(
                               width: double.infinity,
                               child: FilledButton(
@@ -993,11 +1008,7 @@ class _RegisterPageState extends State<RegisterPage> {
       Municipio? municipioEncontrado;
       final codigoIbge = endereco.codigoIbge;
       if (codigoIbge != null && codigoIbge > 0) {
-        municipioEncontrado = await IbgeService.buscarMunicipioPorId(
-          idMunicipio: codigoIbge,
-          siglaUf: estado.sigla,
-          codigoUf: estado.codigoIbge,
-        );
+        municipioEncontrado = await MunicipioService.buscarMunicipioPorId(codigoIbge);
       }
 
       if (municipioEncontrado == null && municipios.isNotEmpty) {
@@ -1481,13 +1492,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _aguardandoMunicipios = false;
     });
 
-    final estadoSelecionado = estadosBrasileiros.firstWhere(
-      (e) => e.sigla.toUpperCase() == siglaUf.toUpperCase(),
-    );
-    var lista = await IbgeService.buscarMunicipiosPorEstado(
-      codigoUf: estadoSelecionado.codigoIbge,
-      siglaUf: estadoSelecionado.sigla,
-    );
+    var lista = await MunicipioService.buscarMunicipios(siglaUf);
     if (!mounted || minhaGeracao != _requestGeneration) return [];
 
     _municipiosCache[siglaUf] = lista;
