@@ -78,19 +78,42 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _loadInitialLocalData() async {
-    _appointments = await _localDb.getAllAppointments();
-    _medications = await _localDb.getAllMedications();
-    
-    // Agenda notificações a partir dos dados locais (essencial para funcionamento offline)
-    if (_medications.isNotEmpty) {
-      NotificationService.instance.scheduleAllMedicationReminders(_medications);
-    }
+    try {
+      _appointments = await _localDb.getAllAppointments();
+      _medications = await _localDb.getAllMedications();
+      
+      if (_medications.isNotEmpty) {
+        NotificationService.instance.scheduleAllMedicationReminders(_medications);
+      }
 
-    final patientMap = await _localDb.getPatient();
-    if (patientMap != null) {
-      _patient = Patient.fromMap(patientMap);
+      final patientMap = await _localDb.getPatient();
+      if (patientMap != null) {
+        final p = Patient.fromMap(patientMap);
+        _patient = p;
+        notifyListeners(); // Notifica para mostrar dados básicos (nome, cpf) o mais rápido possível
+
+        if (p.codigoMunicipio != null) {
+          try {
+            final municipio = await MunicipioService.buscarMunicipioPorId(p.codigoMunicipio!);
+            if (municipio != null) {
+              _patient = p.copyWith(
+                nomeMunicipio: municipio.nome,
+                siglaUf: p.siglaUf?.isNotEmpty == true ? p.siglaUf : municipio.siglaUf,
+                codigoUf: p.codigoUf ?? municipio.codigoUf,
+              );
+              debugPrint('[AppState] Município resolvido offline: ${_patient?.nomeMunicipio}');
+              notifyListeners(); // Notifica novamente com o nome do município e estado
+            }
+          } catch (e) {
+            debugPrint('[AppState] Erro ao resolver município offline: $e');
+          }
+        }
+      } else {
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[AppState] Erro ao carregar dados locais iniciais: $e');
     }
-    notifyListeners();
   }
 
   void _startSyncTimer() {
