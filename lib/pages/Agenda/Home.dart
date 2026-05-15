@@ -14,11 +14,10 @@ import '../Perfil/Perfil.dart';
 import '../Medicamentos/NovoMedicamento.dart';
 import 'NovaConsulta.dart';
 import '../Perfil/Configuracoes.dart';
-import '../Dicas/DicasSaude.dart';
 
 // Classes exportadas de profile_page.dart
 export '../Perfil/Perfil.dart'
-    show EditPersonalContactsPage, EditEmergencyContactPage, QrProfilePage;
+    show EditPersonalContactsPage, EditEmergencyContactPage;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -412,16 +411,6 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.favorite),
-                title: const Text('Dicas de saúde'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const HealthTipsPage()),
-                  );
-                },
-              ),
-              ListTile(
                 leading: const Icon(Icons.history),
                 title: const Text('Histórico de Consultas'),
                 onTap: () {
@@ -430,17 +419,6 @@ class _HomePageState extends State<HomePage> {
                     MaterialPageRoute(
                       builder: (_) => const AppointmentHistoryPage(),
                     ),
-                  );
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.qr_code),
-                title: const Text('Compartilhar perfil (QR)'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const QrProfilePage()),
                   );
                 },
               ),
