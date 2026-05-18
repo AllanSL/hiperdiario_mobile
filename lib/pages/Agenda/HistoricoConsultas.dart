@@ -253,50 +253,11 @@ class _HistoryCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (appointment.attended == null) ...[
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => _showAttendanceDialog(context),
-                      child: const Text('Registrar'),
-                    ),
-                  ],
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showAttendanceDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Registrar Comparecimento'),
-        content: const Text('Você compareceu a esta consulta?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              context.read<AppState>().markAppointmentAttendance(
-                appointment.id,
-                false,
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('Não'),
-          ),
-          FilledButton(
-            onPressed: () {
-              context.read<AppState>().markAppointmentAttendance(
-                appointment.id,
-                true,
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('Sim'),
-          ),
-        ],
       ),
     );
   }

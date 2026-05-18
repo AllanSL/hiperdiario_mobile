@@ -114,7 +114,7 @@ class CnesProfissional {
 class CnesService {
   static const _baseUrl =
       'https://apidadosabertos.saude.gov.br/cnes/estabelecimentos';
-  static const _requestTimeout = Duration(seconds: 20);
+  static const _requestTimeout = Duration(seconds: 15);
   static const _maxAttempts = 3;
 
   static Future<http.Response?> _getWithRetry(
@@ -375,16 +375,20 @@ class CnesService {
     final uri = Uri.parse(_baseUrl).replace(queryParameters: params);
 
     const int maxAttempts = 3;
-    const Duration retryDelay = Duration(milliseconds: 600);
+    const Duration retryDelay = Duration(milliseconds: 1000);
+
+    int? lastStatusCode;
 
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         final response = await http
             .get(uri, headers: {'Accept': 'application/json'})
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 15));
 
         debugPrint('[CnesService] GET $uri (attempt $attempt)');
         debugPrint('[CnesService] Status: ${response.statusCode}');
+
+        lastStatusCode = response.statusCode;
 
         if (response.statusCode != 200) {
           debugPrint('[CnesService] Resposta não-200: ${response.body}');
@@ -392,6 +396,7 @@ class CnesService {
           continue;
         }
 
+        // Resposta 200 — processa normalmente
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final lista = data['estabelecimentos'] as List<dynamic>? ?? [];
         debugPrint('[CnesService] Estabelecimentos recebidos: ${lista.length}');
@@ -423,10 +428,16 @@ class CnesService {
           await Future.delayed(retryDelay);
           continue;
         }
-        return [];
+        // Esgotou tentativas com exceção de rede
+        throw Exception(
+          'Falha de conexão com o servidor CNES após $maxAttempts tentativas: $e',
+        );
       }
     }
 
-    return [];
+    // Esgotou tentativas com respostas HTTP de erro (ex: 503)
+    throw Exception(
+      'Serviço CNES temporariamente indisponível (HTTP $lastStatusCode). Tente novamente mais tarde.',
+    );
   }
 }

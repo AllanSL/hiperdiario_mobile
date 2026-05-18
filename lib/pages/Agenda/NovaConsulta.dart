@@ -136,14 +136,26 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
     debugPrint(
       '[AddAppointment] Buscando estabelecimentos: UF=$codigoUf, Município=$codigoMunicipio (${patient?.nomeMunicipio})',
     );
-    final resultado = await CnesService.buscarEstabelecimentos(
-      codigoUf: codigoUf,
-      codigoMunicipio: codigoMunicipio,
-      // Filtra apenas UBS (codigo_tipo_unidade = 2)
-      tipoUnidade: 2,
-    ).timeout(const Duration(seconds: 10), onTimeout: () => []);
+
+    // O CnesService já possui retry interno (3 tentativas × 10s cada).
+    // Não aplicamos timeout externo para não abortar antes da última tentativa.
+    List<CnesEstabelecimento> resultado;
+    bool erroConexao = false;
+    try {
+      resultado = await CnesService.buscarEstabelecimentos(
+        codigoUf: codigoUf,
+        codigoMunicipio: codigoMunicipio,
+        // Filtra apenas UBS (codigo_tipo_unidade = 2)
+        tipoUnidade: 2,
+      );
+    } catch (e) {
+      debugPrint('[AddAppointment] Erro ao buscar estabelecimentos: $e');
+      resultado = [];
+      erroConexao = true;
+    }
+
     debugPrint(
-      '[AddAppointment] Estabelecimentos carregados: ${resultado.length}',
+      '[AddAppointment] Estabelecimentos carregados: ${resultado.length} (erro=$erroConexao)',
     );
     if (mounted) {
       if (widget.appointment == null &&
@@ -173,7 +185,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
               est.codigoCnes.toString() == appointmentLocation) {
             _estabelecimenteSelecionado = est;
             _carregarEspecialidades(est, initial: true);
-            
+
             // Atualiza o controller com o nome da unidade em vez do código CNES
             _locationController.removeListener(_onLocationChanged);
             _locationController.text = est.nomeFantasia;
@@ -187,7 +199,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
         _todosEstabelecimentos = resultado;
         _sugestoesFiltradas = resultado;
         _cnesCarregando = false;
-        _cnesErro = resultado.isEmpty;
+        // Só marca como erro se houve falha real de conexão.
+        // Lista vazia = município sem UBS cadastradas (exibe aviso diferente).
+        _cnesErro = erroConexao;
       });
     }
   }
@@ -223,6 +237,8 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
 
   void _onFocusChanged() {
     if (_locationFocusNode.hasFocus) {
+      // Não abre o dropdown se a API do CNES estiver com erro
+      if (_cnesErro) return;
       // Ao ganhar foco, abrimos o dropdown em modo readOnly (sem teclado).
       setState(() => _locationModoDigitacao = false);
       _abrirDropdown();
@@ -836,6 +852,13 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                           erro: _cnesErro,
                           colorScheme: colorScheme,
                           onSelected: _selecionarEstabelecimento,
+                          onRetry: () {
+                            setState(() {
+                              _cnesCarregando = true;
+                              _cnesErro = false;
+                            });
+                            _carregarEstabelecimentos();
+                          },
                           maxHeight: alturaDisponivel.clamp(
                             120.0,
                             double.infinity,
@@ -854,9 +877,9 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                             ),
                           ),
                     focusNode: _locationFocusNode,
-                    enabled: !_locationFixa,
+                    enabled: !_locationFixa && !_cnesErro,
                     readOnly: !_locationModoDigitacao,
-                    onTap: _locationFixa ? null : _onLocationTap,
+                    onTap: (_locationFixa || _cnesErro) ? null : _onLocationTap,
                     textCapitalization: TextCapitalization.words,
                     decoration: AppInputDecoration.build(
                       context,
@@ -880,7 +903,7 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                                 ),
                               ),
                             )
-                          : _locationFixa
+                          : (_locationFixa || _cnesErro)
                           ? null
                           : _locationController.text.isNotEmpty
                           ? IconButton(
@@ -917,6 +940,45 @@ class _AddAppointmentPageState extends State<AddAppointmentPage> {
                         : null,
                   ),
                 ),
+                // Banner de aviso quando a API do CNES está fora do ar
+                if (_cnesErro) ...[                
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.cloud_off_rounded, size: 16, color: colorScheme.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Consulta de estabelecimento indisponível no momento.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(Icons.refresh_rounded, size: 20, color: colorScheme.error),
+                          onPressed: () {
+                            setState(() {
+                              _cnesCarregando = true;
+                              _cnesErro = false;
+                            });
+                            _carregarEstabelecimentos();
+                          },
+                          tooltip: 'Tentar novamente',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 // Especialidade
                 OverlayPortal(
@@ -1323,6 +1385,7 @@ class _DropdownCnes extends StatelessWidget {
   final bool erro;
   final ColorScheme colorScheme;
   final ValueChanged<CnesEstabelecimento> onSelected;
+  final VoidCallback? onRetry;
   final double maxHeight;
 
   const _DropdownCnes({
@@ -1331,6 +1394,7 @@ class _DropdownCnes extends StatelessWidget {
     this.erro = false,
     required this.colorScheme,
     required this.onSelected,
+    this.onRetry,
     required this.maxHeight,
   });
 
@@ -1401,19 +1465,47 @@ class _DropdownCnes extends StatelessWidget {
 
   Widget _buildErro(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.wifi_off_rounded, color: colorScheme.error, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Não foi possível carregar os locais. Verifique sua conexão.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+          Row(
+            children: [
+              Icon(Icons.cloud_off_rounded, color: colorScheme.error, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Serviço CNES temporariamente indisponível.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.error,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Digite o nome da UBS manualmente no campo acima, ou tente recarregar.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: colorScheme.primary,
+              ),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Tentar novamente', style: TextStyle(fontSize: 13)),
+            ),
+          ],
         ],
       ),
     );
